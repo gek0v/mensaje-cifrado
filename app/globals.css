@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
+  
+  /* Cyberpunk Palette */
+  --neon-purple: #a855f7;
+  --neon-blue: #3b82f6;
+  --neon-red: #ef4444;
+  --dark-surface: #0f0f11;
 }
 
 @theme inline {
@@ -12,15 +18,34 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
+}
+
+@layer utilities {
+  .text-glow-purple {
+    text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+  }
+  .text-glow-red {
+    text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  }
+  .text-glow-blue {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  }
+  
+  .box-glow-purple {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+  }
+  
+  .border-glow-purple {
+    box-shadow: 0 0 5px rgba(168, 85, 247, 0.5), inset 0 0 10px rgba(168, 85, 247, 0.1);
+  }
+
+  .glass-panel {
+    background: rgba(20, 20, 23, 0.7);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
 }

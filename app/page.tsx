@@ -9,11 +9,7 @@ export default function Home() {
   const router = useRouter();
 
   const createRoom = () => {
-    const socket = io(); // Connect to same host
-    // We just need to signal creation, but usually we can just generate an ID and go there.
-    // My server implementation for 'create_room' takes a roomId. 
-    // So I can generate a random ID client side or ask server.
-    // Let's generate a simple random 4-letter code.
+    const socket = io(); 
     const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     
     socket.emit('create_room', newRoomId, (response: any) => {
@@ -35,39 +31,47 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-100 text-gray-900 font-sans">
-      <h1 className="text-5xl font-bold mb-8 text-blue-600">CÓDIGO SECRETO</h1>
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 bg-black text-white font-sans relative overflow-hidden">
       
-      <div className="bg-white p-8 rounded-xl shadow-lg flex flex-col gap-6 w-full max-w-md">
-        <button 
-          onClick={createRoom}
-          className="w-full py-4 bg-blue-600 text-white rounded-lg font-bold text-xl hover:bg-blue-700 transition"
-        >
-          CREAR NUEVA SALA
-        </button>
+      {/* Background Effects */}
+      <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-black to-black z-0 pointer-events-none"></div>
+      
+      <div className="z-10 flex flex-col items-center w-full max-w-md">
+        <h1 className="text-6xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-br from-purple-400 to-purple-700 tracking-tighter text-glow-purple">
+          CÓDIGO<br/>SECRETO
+        </h1>
         
-        <div className="relative flex py-2 items-center">
-          <div className="flex-grow border-t border-gray-300"></div>
-          <span className="flex-shrink mx-4 text-gray-400">O</span>
-          <div className="flex-grow border-t border-gray-300"></div>
-        </div>
+        <div className="glass-panel p-8 rounded-2xl w-full box-glow-purple border border-white/5">
+          <button 
+            onClick={createRoom}
+            className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold text-xl hover:bg-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all transform active:scale-95 tracking-widest border border-purple-400/30"
+          >
+            CREAR SALA
+          </button>
+          
+          <div className="relative flex py-8 items-center">
+            <div className="flex-grow border-t border-white/10"></div>
+            <span className="flex-shrink mx-4 text-gray-500 font-mono text-xs">SISTEMA DE ACCESO</span>
+            <div className="flex-grow border-t border-white/10"></div>
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <label className="font-semibold text-gray-600">Unirse a sala existente:</label>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              placeholder="CÓDIGO"
-              className="flex-1 p-3 border-2 border-gray-300 rounded-lg uppercase font-bold tracking-widest text-center focus:border-blue-500 outline-none"
-            />
-            <button 
-              onClick={joinRoom}
-              className="px-4 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900"
-            >
-              ENTRAR
-            </button>
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-purple-400 uppercase tracking-widest ml-1">Código de Acceso</label>
+            <div className="flex flex-col gap-2">
+              <input 
+                type="text" 
+                value={roomId}
+                onChange={(e) => setRoomId(e.target.value)}
+                placeholder="XW9A"
+                className="w-full p-4 bg-black/50 border border-white/10 rounded-xl uppercase font-mono font-bold text-xl tracking-[0.2em] text-center focus:border-purple-500 focus:shadow-[0_0_10px_rgba(168,85,247,0.3)] outline-none text-white placeholder-gray-700 transition-all"
+              />
+              <button 
+                onClick={joinRoom}
+                className="w-full h-12 flex items-center justify-center bg-white/5 border border-white/10 text-white rounded-xl font-bold hover:bg-white/10 hover:border-white/30 hover:text-purple-200 transition-all text-lg tracking-widest"
+              >
+                ACCEDER
+              </button>
+            </div>
           </div>
         </div>
       </div>

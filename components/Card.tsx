@@ -12,61 +12,76 @@ export default function Card({ card, role, onClick }: CardProps) {
   const isSpymaster = role.includes('SPYMASTER');
   const showColor = card.revealed || isSpymaster;
   
-  // Base styles
-  let bgColor = "bg-gray-200";
-  let textColor = "text-gray-800";
-  let borderColor = "border-gray-300";
+  // Base styles for Dark / Cyberpunk Theme
+  let baseClass = "bg-[#111] border-gray-800 text-gray-300 shadow-sm"; // Default unrevealed state
+  let overlayClass = "";
+  let textClass = "";
 
   if (showColor) {
     switch (card.type) {
       case 'RED':
-        bgColor = "bg-red-500";
-        textColor = "text-white";
-        borderColor = "border-red-600";
+        baseClass = "bg-red-900/20 border-red-500 text-red-100 shadow-[0_0_15px_rgba(239,68,68,0.3)]";
+        if (card.revealed) baseClass += " bg-red-600 text-white shadow-[0_0_25px_rgba(239,68,68,0.6)] border-transparent";
         break;
       case 'BLUE':
-        bgColor = "bg-blue-500";
-        textColor = "text-white";
-        borderColor = "border-blue-600";
+        baseClass = "bg-blue-900/20 border-blue-500 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]";
+        if (card.revealed) baseClass += " bg-blue-600 text-white shadow-[0_0_25px_rgba(59,130,246,0.6)] border-transparent";
         break;
       case 'NEUTRAL':
-        bgColor = "bg-amber-200";
-        textColor = "text-amber-900";
-        borderColor = "border-amber-300";
+        baseClass = "bg-gray-800/50 border-gray-600 text-gray-400";
+        if (card.revealed) baseClass += " bg-gray-800 text-gray-500 opacity-50";
         break;
       case 'ASSASSIN':
-        bgColor = "bg-gray-900";
-        textColor = "text-white";
-        borderColor = "border-black";
+        baseClass = "bg-fuchsia-950/30 border-fuchsia-500/50 text-fuchsia-200";
+        if (card.revealed) baseClass = "bg-fuchsia-900 border-fuchsia-600 text-white shadow-[0_0_30px_rgba(232,121,249,0.8)] animate-pulse";
         break;
     }
+  } else {
+      // Unrevealed for Table
+      baseClass = "bg-[#161616] border-white/10 text-gray-200 hover:bg-[#1a1a1a] hover:border-white/20 hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] transition-all duration-300";
   }
 
-  // Spymaster view of unrevealed cards should be "tinted" or just clear but marked?
-  // Usually Spymaster sees the full color map.
-  // If it's revealed, we might want to mark it as "done" (e.g. opacity or an overlay).
+  // If spymaster sees unrevealed cards, they are semi-transparent or outlined
+  if (isSpymaster && !card.revealed) {
+      // We keep the colored border but transparent background
+      switch (card.type) {
+          case 'RED': baseClass = "bg-[#111] border-red-900/80 text-red-400"; break;
+          case 'BLUE': baseClass = "bg-[#111] border-blue-900/80 text-blue-400"; break;
+          case 'NEUTRAL': baseClass = "bg-[#0a0a0a] border-gray-800 text-gray-600 opacity-60"; break;
+          case 'ASSASSIN': baseClass = "bg-black border-fuchsia-700/80 text-fuchsia-400"; break;
+      }
+  }
   
-  const opacity = card.revealed ? "opacity-50" : "opacity-100";
-  const cursor = (!card.revealed && role === 'TABLE') ? "cursor-pointer hover:scale-105 transition-transform" : "cursor-default";
+  const cursor = (!card.revealed && role === 'TABLE') ? "cursor-pointer active:scale-95" : "cursor-default";
+  const revealedOpacity = (card.revealed && card.type === 'NEUTRAL') ? 'opacity-40' : 'opacity-100';
 
   return (
     <div 
       onClick={(!card.revealed && role === 'TABLE') ? onClick : undefined}
       className={`
         relative flex items-center justify-center 
-        w-full h-full rounded-lg border-b-2 sm:border-b-4 
-        ${bgColor} ${textColor} ${borderColor} ${opacity} ${cursor}
-        shadow-md font-bold text-xs sm:text-sm md:text-lg lg:text-xl select-none overflow-hidden
+        w-full h-full rounded-xl border
+        ${baseClass} ${cursor} ${revealedOpacity}
+        font-bold text-xs sm:text-sm md:text-lg select-none overflow-hidden
+        transition-all duration-200
       `}
     >
-      <span className="uppercase text-center px-1 leading-tight z-10">
+      <span className="uppercase text-center px-1 leading-tight z-10 tracking-wider">
         {card.word}
       </span>
       
-      {/* Optional: Icon for Spymaster to verify type if colorblind or just for clarity */}
-      {isSpymaster && !card.revealed && (
-          <div className="absolute top-1 right-1 text-[10px] opacity-50">
-              {card.type[0]}
+      {/* Decoration for unrevealed cards to look "techy" */}
+      {!showColor && (
+          <>
+            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 rounded-tl-md"></div>
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 rounded-br-md"></div>
+          </>
+      )}
+
+      {/* Assassin Marker for Spymaster */}
+      {isSpymaster && !card.revealed && card.type === 'ASSASSIN' && (
+          <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
+              <span className="text-4xl">☠</span>
           </div>
       )}
     </div>
