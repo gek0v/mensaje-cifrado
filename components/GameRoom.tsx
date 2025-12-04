@@ -10,6 +10,7 @@ interface GameRoomProps {
 }
 
 type Role = 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE' | null;
+type NotificationPayload = { nickname: string; role: Role };
 
 let socket: Socket; // Keeping module scope for simplicity as handlers need it, but strictly managing in useEffect is better. 
 // Actually, let's move it to a ref inside component to be 100% safe against race conditions.
