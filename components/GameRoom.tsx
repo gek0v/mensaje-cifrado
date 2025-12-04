@@ -26,6 +26,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const [notifications, setNotifications] = useState<{id: number, payload: NotificationPayload}[]>([]);
   const [clueNumber, setClueNumber] = useState<number>(1);
   const [isHost, setIsHost] = useState(false);
+  const [showTimeMenu, setShowTimeMenu] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -120,6 +121,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       router.push('/');
   };
 
+  const handleChangeTime = (newTime: number) => {
+      socket.emit('change_max_time', { roomId, maxTime: newTime });
+      setShowTimeMenu(false);
+  };
+
   if (!role) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
@@ -129,18 +135,26 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
         <div className="glass-panel p-8 rounded-2xl shadow-2xl max-w-lg w-full text-center relative z-10 border border-purple-500/20 box-glow-purple">
           <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-2">SALA DE ACCESO</h2>
-          <div className="inline-block bg-purple-900/30 border border-purple-500/30 px-3 py-1 rounded font-mono text-purple-200 mb-6 tracking-widest">{roomId}</div>
+          <div className={`inline-block bg-purple-900/30 border ${
+            gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/30 text-emerald-200' : 'border-purple-500/30 text-purple-200'
+          } px-3 py-1 rounded font-mono mb-6 tracking-widest`}>{roomId}</div>
           
           {error && <div className="bg-red-900/50 border border-red-500/50 text-red-200 p-3 rounded mb-4 text-sm">{error}</div>}
           
           <div className="flex flex-col gap-6 text-left">
             <div>
-                <label className="text-xs font-bold text-purple-400 uppercase tracking-widest mb-2 block">Identificación</label>
+                <label className={`text-xs font-bold uppercase tracking-widest mb-2 block ${
+                    gameState?.gameMode === 'NEURAL_LINK' ? 'text-emerald-400' : 'text-purple-400'
+                }`}>Identificación</label>
                 <input 
                     type="text" 
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
-                    className="w-full p-4 bg-black/40 border border-white/10 rounded-xl font-bold text-white focus:border-purple-500 focus:shadow-[0_0_15px_rgba(168,85,247,0.2)] outline-none transition-all"
+                    className={`w-full p-4 bg-black/40 border border-white/10 rounded-xl font-bold text-white outline-none transition-all ${
+                        gameState?.gameMode === 'NEURAL_LINK'
+                            ? 'focus:border-emerald-500 focus:shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                            : 'focus:border-purple-500 focus:shadow-[0_0_15px_rgba(168,85,247,0.2)]'
+                    }`}
                     placeholder="Nombre en clave..."
                 />
             </div>
@@ -150,29 +164,35 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             <div className="flex flex-col gap-3">
                 <button 
                 onClick={() => handleJoin('TABLE')}
-                className="group relative p-5 bg-gray-900/80 border border-white/10 rounded-xl hover:border-purple-500/50 hover:bg-purple-900/10 transition-all overflow-hidden"
+                className={`group relative p-5 bg-gray-900/80 border border-white/10 rounded-xl transition-all overflow-hidden ${
+                    gameState?.gameMode === 'NEURAL_LINK'
+                        ? 'hover:border-emerald-500/50 hover:bg-emerald-900/10'
+                        : 'hover:border-purple-500/50 hover:bg-purple-900/10'
+                }`}
                 >
                     <div className="flex flex-col items-center gap-1">
-                        <span className="font-bold text-xl text-white group-hover:text-purple-200 tracking-widest">MESA DE JUEGO</span>
+                        <span className={`font-bold text-xl text-white tracking-widest ${
+                            gameState?.gameMode === 'NEURAL_LINK' ? 'group-hover:text-emerald-200' : 'group-hover:text-purple-200'
+                        }`}>MESA DE JUEGO</span>
                         <span className="text-[10px] text-gray-500 group-hover:text-purple-400 uppercase tracking-widest">Pantalla Principal</span>
                     </div>
                 </button>
                 
                 <div className="grid grid-cols-2 gap-4 mt-2">
-                <button 
-                    onClick={() => handleJoin('SPYMASTER_RED')}
-                    className={`p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all font-bold ${gameState?.gameMode === 'NEURAL_LINK' ? 'col-span-2' : ''}`}
-                >
-                    JEFE ROJO
-                </button>
                 {gameState?.gameMode !== 'NEURAL_LINK' && (
                     <button 
-                        onClick={() => handleJoin('SPYMASTER_BLUE')}
-                        className="p-4 bg-blue-950/30 border border-blue-900/50 text-blue-400 rounded-xl hover:bg-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all font-bold"
+                        onClick={() => handleJoin('SPYMASTER_RED')}
+                        className="p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all font-bold"
                     >
-                        JEFE AZUL
+                        JEFE ROJO
                     </button>
                 )}
+                <button 
+                    onClick={() => handleJoin('SPYMASTER_BLUE')}
+                    className={`p-4 bg-blue-950/30 border border-blue-900/50 text-blue-400 rounded-xl hover:bg-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all font-bold ${gameState?.gameMode === 'NEURAL_LINK' ? 'col-span-2' : ''}`}
+                >
+                    JEFE AZUL
+                </button>
                 </div>
             </div>
 
@@ -218,6 +238,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
              let bgColor = "bg-purple-900/90";
              let borderColor = "border-purple-400";
              let shadowColor = "shadow-[0_0_20px_rgba(168,85,247,0.6)]";
+             
+             if (gameState.gameMode === 'NEURAL_LINK' && safeRole === 'TABLE') {
+                bgColor = "bg-emerald-900/90";
+                borderColor = "border-emerald-400";
+                shadowColor = "shadow-[0_0_20px_rgba(16,185,129,0.6)]";
+             }
+
 
              switch (safeRole) {
                 case 'SPYMASTER_RED':
@@ -250,8 +277,12 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 grid grid-cols-3 items-center sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
         <div className="hidden sm:flex items-center gap-4">
           <div className="flex flex-col leading-none">
-            <span className="text-[10px] text-purple-500 tracking-[0.3em] font-bold">SALA</span>
-            <span className="font-mono text-white text-lg tracking-widest text-glow-purple">{roomId}</span>
+            <span className={`text-[10px] tracking-[0.3em] font-bold ${
+                gameState?.gameMode === 'NEURAL_LINK' ? 'text-emerald-500' : 'text-purple-500'
+            }`}>SALA</span>
+            <span className={`font-mono text-white text-lg tracking-widest ${
+                gameState?.gameMode === 'NEURAL_LINK' ? 'text-glow-emerald' : 'text-glow-purple'
+            }`}>{roomId}</span>
           </div>
         </div>
         
@@ -283,12 +314,32 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                  {nickname}
              </div>
 
-            <div className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border ${
-                gameState.gameMode === 'NEURAL_LINK' 
-                ? 'bg-purple-500/10 border-purple-500 text-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
-                : isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
-            }`}>
-                {gameState.gameMode === 'NEURAL_LINK' ? 'ENLACE ACTIVO' : (isRedTurn ? 'TURNO ROJO' : 'TURNO AZUL')}
+             <div className="relative">
+                                 <button 
+                                    onClick={() => {
+                                        if (isHost && gameState.gameMode === 'NEURAL_LINK') {
+                                            setShowTimeMenu(!showTimeMenu);
+                                        }
+                                    }}
+                                    disabled={!isHost || gameState.gameMode !== 'NEURAL_LINK'}
+                                    className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border transition-all ${
+                                        gameState.gameMode === 'NEURAL_LINK' 
+                                        ? `bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)] ${isHost ? 'hover:bg-emerald-500/20 cursor-pointer' : 'cursor-default'}`
+                                        : isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)] cursor-default' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)] cursor-default'
+                                    }`}
+                                >
+                                    {gameState.gameMode === 'NEURAL_LINK' ? 'DURACIÓN' : (isRedTurn ? 'TURNO ROJO' : 'TURNO AZUL')}
+                                </button>                
+                {/* Floating Time Menu */}
+                {showTimeMenu && (
+                    <div className="absolute top-full right-0 mt-2 w-32 bg-black/90 border border-emerald-500/50 rounded-xl shadow-[0_0_20px_rgba(16,185,129,0.3)] overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
+                        <div className="flex flex-col">
+                             <button onClick={() => handleChangeTime(90)} className="px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all text-left">1:30 MIN</button>
+                             <button onClick={() => handleChangeTime(180)} className="px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all text-left border-t border-emerald-500/10">3 MIN</button>
+                             <button onClick={() => handleChangeTime(300)} className="px-4 py-2 text-xs font-bold text-emerald-400 hover:bg-emerald-500/20 transition-all text-left border-t border-emerald-500/10">5 MIN</button>
+                        </div>
+                    </div>
+                )}
             </div>
             
             {/* New buttons for changing role and returning home */}
@@ -317,7 +368,9 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
       {/* Status Bar / Notifications */}
       <div className="w-full bg-[#0a0a0a] border-b border-white/5 p-3 text-center relative overflow-hidden transition-all duration-300">
-        <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
+        <div className={`absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent ${
+            gameState?.gameMode === 'NEURAL_LINK' ? 'via-emerald-500/50' : 'via-purple-500/50'
+        } to-transparent`}></div>
         
         {gameState.winner ? (
              <span className="text-2xl font-black tracking-widest text-yellow-400 animate-pulse drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]">MISIÓN FINALIZADA</span>
@@ -333,23 +386,42 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                             )}
                             {isMyTurn && (
                                 <div className="flex items-center gap-4 justify-center animate-in fade-in slide-in-from-top-2">
-                                    <select 
-                                        value={clueNumber} 
-                                        onChange={(e) => setClueNumber(Number(e.target.value))}
-                                        className="bg-black border border-purple-500/50 text-purple-400 px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500"
-                                    >
-                                        {[1,2,3,4,5,6,7,8,9].map(n => (
-                                            <option key={n} value={n}>{n}</option>
-                                        ))}
-                                        <option value={0}>0</option>
-                                        <option value={-1}>∞</option>
-                                    </select>
-                                    <button 
-                                        onClick={handleGiveClue}
-                                        className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-1 rounded font-bold text-sm tracking-widest shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
-                                    >
-                                        TRANSMITIR
-                                    </button>
+                                    {gameState.gameMode === 'NEURAL_LINK' ? (
+                                        <button 
+                                            onClick={() => {
+                                                socket.emit('give_clue', { roomId, number: -1 });
+                                            }}
+                                            className="px-8 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-bold text-base tracking-widest shadow-[0_0_20px_rgba(16,185,129,0.6)] transition-all animate-pulse"
+                                        >
+                                            INICIAR SISTEMA
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <select 
+                                                value={clueNumber} 
+                                                onChange={(e) => setClueNumber(Number(e.target.value))}
+                                                className={`bg-black border ${
+                                                    gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/50 text-emerald-400' : 'border-purple-500/50 text-purple-400'
+                                                } px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500`}
+                                            >
+                                                {[1,2,3,4,5,6,7,8,9].map(n => (
+                                                    <option key={n} value={n}>{n}</option>
+                                                ))}
+                                                <option value={0}>0</option>
+                                                <option value={-1}>∞</option>
+                                            </select>
+                                            <button 
+                                                onClick={handleGiveClue}
+                                                className={`px-6 py-1 text-white rounded font-bold text-sm tracking-widest transition-all ${
+                                                    gameState?.gameMode === 'NEURAL_LINK'
+                                                        ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                                                        : 'bg-purple-600 hover:bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
+                                                }`}
+                                            >
+                                                TRANSMITIR
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -357,12 +429,12 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                         <div className="flex flex-col items-center animate-in fade-in duration-300">
                             <div className="flex items-baseline gap-3">
                                 <span className="text-gray-500 text-[10px] font-mono uppercase tracking-[0.2em]">OBJETIVOS</span>
-                                <span className="text-3xl font-black text-white text-glow-purple font-mono">
+                                <span className={`text-3xl font-black text-white font-mono ${gameState.gameMode === 'NEURAL_LINK' ? 'text-glow-emerald' : 'text-glow-purple'}`}>
                                     {gameState.currentClueNumber === -1 ? '∞' : gameState.currentClueNumber}
                                 </span>
                             </div>
                             
-                            {role === 'TABLE' && (
+                            {role === 'TABLE' && gameState.gameMode !== 'NEURAL_LINK' && (
                                 <button 
                                     onClick={handleEndTurn}
                                     className="mt-2 px-6 py-1 bg-transparent border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] text-xs font-bold rounded transition-all uppercase tracking-widest"

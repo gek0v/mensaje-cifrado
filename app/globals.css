@@ -34,9 +34,15 @@ body {
   .text-glow-blue {
     text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
   }
+  .text-glow-emerald {
+    text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  }
   
   .box-glow-purple {
     box-shadow: 0 0 20px rgba(168, 85, 247, 0.15);
+  }
+  .box-glow-emerald {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
   }
   
   .border-glow-purple {

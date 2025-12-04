@@ -41,7 +41,7 @@ app.prepare().then(() => {
             if (room.timer <= 0) {
                 room.timer = 0;
                 room.timerActive = false;
-                room.winner = 'BLUE'; // System wins (Blue represents System/Time in this mode context usually, or just 'BLUE' as enemy)
+                room.winner = 'RED'; // System (RED) wins in Neural Link (Player is BLUE)
                 room.log.push("TIME OVER! SYSTEM WINS!");
                 io.to(roomId).emit("game_update", sanitizeState(room));
             } else {
@@ -58,7 +58,7 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
 
-    socket.on("create_room", (roomId: string, mode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD', callback) => {
+    socket.on("create_room", (roomId: string, mode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD', maxTime: number = 180, callback) => {
         if (rooms.has(roomId)) {
             callback({ error: "Room already exists" });
             return;
@@ -68,12 +68,12 @@ app.prepare().then(() => {
         const blueTotal = board.filter(c => c.type === 'BLUE').length;
         const hostSecret = randomBytes(16).toString('hex');
         
-        const defaultMaxTime = 180; // 3 minutes for Neural Link mode
+        const selectedMaxTime = mode === 'NEURAL_LINK' ? maxTime : 0;
 
         const initialState: ServerGameState = {
             roomId,
             board,
-            turn: startingTeam, // In Neural Link, usually Red starts, but let's keep random for now or force RED? Let's force RED for Neural Link usually.
+            turn: startingTeam,
             phase: 'CLUE',
             currentClueNumber: null,
             currentGuessesCount: 0,
@@ -84,14 +84,14 @@ app.prepare().then(() => {
             spymasters: { RED: [], BLUE: [] },
             hostSecret,
             gameMode: mode,
-            timer: mode === 'NEURAL_LINK' ? defaultMaxTime : 0,
+            timer: selectedMaxTime,
             timerActive: false,
-            maxTime: defaultMaxTime,
+            maxTime: selectedMaxTime,
         };
         
-        // Force RED start for Neural Link single player feel
+        // Force BLUE start for Neural Link (Player is BLUE)
         if (mode === 'NEURAL_LINK') {
-            initialState.turn = 'RED'; 
+            initialState.turn = 'BLUE'; 
         }
 
         rooms.set(roomId, initialState);
@@ -139,12 +139,17 @@ app.prepare().then(() => {
         room.currentClueNumber = number;
         room.currentGuessesCount = 0;
         room.phase = 'GUESSING';
-        room.log.push(`Clue given! Max words: ${number}`);
         
         // Start timer in Neural Link if not active
-        if (room.gameMode === 'NEURAL_LINK' && !room.timerActive) {
-            room.timerActive = true;
-            room.log.push("NEURAL LINK ESTABLISHED. TIMER STARTED.");
+        if (room.gameMode === 'NEURAL_LINK') {
+             if (!room.timerActive) {
+                room.timerActive = true;
+                room.log.push("NEURAL LINK ESTABLISHED. TIMER STARTED.");
+             } else {
+                 room.log.push("DATA STREAM RESUMED.");
+             }
+        } else {
+             room.log.push(`Clue given! Max words: ${number}`);
         }
         
         io.to(roomId).emit("game_update", sanitizeState(room));
@@ -194,24 +199,23 @@ app.prepare().then(() => {
 
         // Logic for turn handling
         if (card.type === 'ASSASSIN') {
-            room.winner = room.turn === 'RED' ? 'BLUE' : 'RED'; // In Neural Link, if RED hits assassin, BLUE (System) wins.
+            // In Neural Link, Player is BLUE. If hit assassin, System (RED) wins.
+            room.winner = room.gameMode === 'NEURAL_LINK' ? 'RED' : (room.turn === 'RED' ? 'BLUE' : 'RED');
             room.timerActive = false;
             room.log.push(`ASSASSIN HIT! SYSTEM FAILURE!`);
             turnEnded = true;
         } else if (room.gameMode === 'NEURAL_LINK') {
-            // Neural Link Logic
+            // Neural Link Logic (Player is BLUE)
             if (card.type === 'NEUTRAL') {
-                const penalty = 30;
-                room.timer = Math.max(0, room.timer - penalty);
-                room.log.push(`Neutral noise encountered. Time penalty: -${penalty}s`);
-                // Do NOT end turn, just penalize
-            } else if (card.type !== room.turn) { // Opponent (Blue) in Neural Link
-                 const penalty = 60;
+                // No penalty for Neural Link Neutral cards
+                room.log.push(`Neutral noise encountered. No time penalty.`);
+            } else if (card.type !== room.turn) { // Opponent (Red) in Neural Link
+                 const penalty = 15;
                  room.timer = Math.max(0, room.timer - penalty);
                  room.log.push(`Enemy firewall hit! Time penalty: -${penalty}s`);
                  // Do NOT end turn, just penalize
             } else {
-                // Correct guess
+                // Correct guess (Blue card)
                 room.currentGuessesCount++;
                 const win = checkWinCondition(room);
                 if (win) {
@@ -220,8 +224,6 @@ app.prepare().then(() => {
                     room.log.push(`${win} WINS! NEURAL LINK SECURE.`);
                     turnEnded = true;
                 }
-                // No limit check enforced in speedrun usually, but we can keep the N+1 rule if desired.
-                // For now, let's allow infinite guesses until time runs out or user stops.
             }
         } else {
             // Standard Logic
@@ -294,7 +296,36 @@ app.prepare().then(() => {
          room.winner = null;
          room.log = [`Game reset. Team ${startingTeam} starts.`];
          
+         if (room.gameMode === 'NEURAL_LINK') {
+             room.turn = 'BLUE'; // Force Blue start on reset too
+             room.timer = room.maxTime || 180; // Reset timer
+             room.timerActive = false;
+         }
+         
          io.to(roomId).emit("game_update", sanitizeState(room));
+    });
+
+    socket.on("change_max_time", ({ roomId, maxTime }: { roomId: string, maxTime: number }) => {
+        const room = rooms.get(roomId);
+        if (!room || room.gameMode !== 'NEURAL_LINK') return;
+        
+        // Prevent changing time if game is active
+        if (room.timerActive) {
+            // room.log.push("SECURITY ALERT: Cannot reconfigure clock during active link!");
+            // Actually, just ignore it or send error? 
+            // Let's log it so users know why it failed.
+             room.log.push("ERROR: Cannot change time while active.");
+             io.to(roomId).emit("game_update", sanitizeState(room));
+             return;
+        }
+        
+        // Update time settings
+        room.maxTime = maxTime;
+        room.timer = maxTime;
+        room.timerActive = false; // Pause timer on change to let them get ready
+        room.log.push(`System clock reconfigured to ${maxTime}s.`);
+        
+        io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
     socket.on("disconnect", () => {
