@@ -15,6 +15,7 @@ export interface GameState {
   turn: 'RED' | 'BLUE';
   phase: 'CLUE' | 'GUESSING';
   currentClueNumber: number | null;
+  currentGuessesCount: number;
   redScore: number;
   blueScore: number;
   winner: 'RED' | 'BLUE' | null;

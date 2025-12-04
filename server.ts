@@ -50,6 +50,7 @@ app.prepare().then(() => {
             turn: startingTeam,
             phase: 'CLUE',
             currentClueNumber: null,
+            currentGuessesCount: 0,
             redScore: redTotal,
             blueScore: blueTotal,
             winner: null,
@@ -91,6 +92,7 @@ app.prepare().then(() => {
         if (!room || room.phase !== 'CLUE') return;
         
         room.currentClueNumber = number;
+        room.currentGuessesCount = 0;
         room.phase = 'GUESSING';
         room.log.push(`Clue given! Max words: ${number}`);
         
@@ -104,6 +106,7 @@ app.prepare().then(() => {
         room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
         room.phase = 'CLUE';
         room.currentClueNumber = null;
+        room.currentGuessesCount = 0;
         room.log.push(`Turn ended manually. Now it's ${room.turn}'s turn.`);
 
         io.to(roomId).emit("game_update", sanitizeState(room));
@@ -149,18 +152,32 @@ app.prepare().then(() => {
              turnEnded = true;
         } else {
             // Correct guess
+             room.currentGuessesCount++;
              const win = checkWinCondition(room);
              if (win) {
                  room.winner = win;
                  room.log.push(`${win} WINS!`);
                  turnEnded = true; // Game over is effectively a turn end
+             } else {
+                 // Check limit (N rules) - User asked to be exactly N
+                 // If currentClueNumber is > 0, limit is N.
+                 // BUT user asked: "Once N words selected also change turn even if correct" -> Wait, "Una vez seleccionadas las N palabras también cambia de turno aunque hayas acertado todas"
+                 // So if guesses == clueNumber, turn ends.
+                 if (room.currentClueNumber && room.currentClueNumber > 0) {
+                     if (room.currentGuessesCount >= room.currentClueNumber) {
+                         room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
+                         room.log.push(`Max guesses reached (${room.currentClueNumber}). Turn passes.`);
+                         turnEnded = true;
+                     }
+                 }
              }
-             // Turn continues if not won
+             // Turn continues if not won and limit not reached
         }
 
         if (turnEnded && !room.winner) {
             room.phase = 'CLUE';
             room.currentClueNumber = null;
+            room.currentGuessesCount = 0;
         }
 
         // Broadcast update
@@ -184,6 +201,7 @@ app.prepare().then(() => {
          room.turn = startingTeam;
          room.phase = 'CLUE';
          room.currentClueNumber = null;
+         room.currentGuessesCount = 0;
          room.redScore = redTotal;
          room.blueScore = blueTotal;
          room.winner = null;

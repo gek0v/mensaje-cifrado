@@ -42,10 +42,16 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
     socket.on('game_update', (newState: GameState) => setGameState(newState));
     
-    socket.on('notification', (message: string) => {
-        console.log("Notification received:", message);
+    // Listen for notification (can be string or object payload)
+    socket.on('notification', (payload: NotificationPayload | string) => {
+        console.log("Notification received:", payload);
         const id = Date.now();
-        setNotifications(prev => [...prev, { id, message }]);
+        // Normalize payload to object structure if it comes as string
+        const normalizedPayload = typeof payload === 'string' 
+            ? { nickname: payload, role: 'TABLE' as Role } // Fallback for string messages
+            : payload;
+
+        setNotifications(prev => [...prev, { id, payload: normalizedPayload }]);
         setTimeout(() => {
             setNotifications(prev => prev.filter(n => n.id !== id));
         }, 4000);

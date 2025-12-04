@@ -20,20 +20,20 @@ export default function Card({ card, role, onClick }: CardProps) {
   if (showColor) {
     switch (card.type) {
       case 'RED':
-        baseClass = "bg-red-900/20 border-red-500 text-red-100 shadow-[0_0_15px_rgba(239,68,68,0.3)]";
-        if (card.revealed) baseClass += " bg-red-600 text-white shadow-[0_0_25px_rgba(239,68,68,0.6)] border-transparent";
+        baseClass = "bg-red-900/20 border-red-500 text-red-100 shadow-[0_0_10px_rgba(239,68,68,0.2)]"; // More compact initial glow
+        if (card.revealed) baseClass = "bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.7)] border-2 border-red-400";
         break;
       case 'BLUE':
-        baseClass = "bg-blue-900/20 border-blue-500 text-blue-100 shadow-[0_0_15px_rgba(59,130,246,0.3)]";
-        if (card.revealed) baseClass += " bg-blue-600 text-white shadow-[0_0_25px_rgba(59,130,246,0.6)] border-transparent";
+        baseClass = "bg-blue-900/20 border-blue-500 text-blue-100 shadow-[0_0_10px_rgba(59,130,246,0.2)]"; // More compact initial glow
+        if (card.revealed) baseClass = "bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.7)] border-2 border-blue-400";
         break;
       case 'NEUTRAL':
         baseClass = "bg-gray-800/50 border-gray-600 text-gray-400";
-        if (card.revealed) baseClass += " bg-gray-800 text-gray-500 opacity-50";
+        if (card.revealed) baseClass = "bg-gray-800 text-gray-500 opacity-50 border-2 border-gray-600";
         break;
       case 'ASSASSIN':
         baseClass = "bg-fuchsia-950/30 border-fuchsia-500/50 text-fuchsia-200";
-        if (card.revealed) baseClass = "bg-fuchsia-900 border-fuchsia-600 text-white shadow-[0_0_30px_rgba(232,121,249,0.8)] animate-pulse";
+        if (card.revealed) baseClass = "bg-fuchsia-900 border-fuchsia-300 text-white shadow-[0_0_20px_rgba(232,121,249,0.9)] animate-pulse border-2";
         break;
     }
   } else {
@@ -81,7 +81,7 @@ export default function Card({ card, role, onClick }: CardProps) {
       {/* Assassin Marker for Spymaster */}
       {isSpymaster && !card.revealed && card.type === 'ASSASSIN' && (
           <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
-              <span className="text-4xl">☠</span>
+              <span className="text-6xl">☠</span>
           </div>
       )}
     </div>
