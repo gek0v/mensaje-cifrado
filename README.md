@@ -36,7 +36,7 @@ bun dev
 
 3. **Abrir en el navegador:**
 
-Visita [http://localhost:3000](http://localhost:3000).
+Visita [https://mensaje-cifrado.onrender.com](https://mensaje-cifrado.onrender.com).
 
 ## Reglas Básicas
 
