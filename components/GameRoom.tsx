@@ -25,7 +25,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [nickname, setNickname] = useState('');
-  const [notifications, setNotifications] = useState<{id: number, message: string}[]>([]);
+  const [notifications, setNotifications] = useState<{id: number, payload: NotificationPayload}[]>([]);
   const [clueNumber, setClueNumber] = useState<number>(1);
   const [isHost, setIsHost] = useState(false);
 
