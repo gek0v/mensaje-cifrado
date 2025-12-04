@@ -81,7 +81,8 @@ app.prepare().then(() => {
         // Send current state
         callback({ success: true, state: sanitizeState(room) });
         
-        // Notify others (optional, but good for updating lists)
+        // Notify others
+        io.to(roomId).emit("notification", { nickname: nickname, role: role });
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
 

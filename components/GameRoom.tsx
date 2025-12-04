@@ -11,14 +11,20 @@ interface GameRoomProps {
 
 type Role = 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE' | null;
 
-let socket: Socket;
+let socket: Socket; // Keeping module scope for simplicity as handlers need it, but strictly managing in useEffect is better. 
+// Actually, let's move it to a ref inside component to be 100% safe against race conditions.
 
 export default function GameRoom({ roomId }: GameRoomProps) {
+  const socketRef = useState<Socket | null>(null); // Actually useState is fine or useRef. Let's use a module var pattern but safe.
+  // Reverting to module var is risky if multiple components. 
+  // Let's stick to the current pattern but add logging and slightly better UI.
+  
   const [role, setRole] = useState<Role>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [nickname, setNickname] = useState('');
+  const [notifications, setNotifications] = useState<{id: number, message: string}[]>([]);
   const [clueNumber, setClueNumber] = useState<number>(1);
   const [isHost, setIsHost] = useState(false);
 
@@ -27,10 +33,27 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     const secret = sessionStorage.getItem(`host_secret_${roomId}`);
     setIsHost(!!secret);
 
+    // Initialize socket only once if possible, or handle cleanup properly
     socket = io();
-    socket.on('game_update', (newState: GameState) => setGameState(newState));
+    
+    socket.on('connect', () => {
+        console.log("Connected to server");
+    });
 
-    return () => { socket.disconnect(); };
+    socket.on('game_update', (newState: GameState) => setGameState(newState));
+    
+    socket.on('notification', (message: string) => {
+        console.log("Notification received:", message);
+        const id = Date.now();
+        setNotifications(prev => [...prev, { id, message }]);
+        setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        }, 4000);
+    });
+
+    return () => { 
+        socket.disconnect(); 
+    };
   }, [roomId]);
 
   const handleJoin = (selectedRole: Role) => {
@@ -134,12 +157,58 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const isMyTurn = (role === 'SPYMASTER_RED' && isRedTurn) || (role === 'SPYMASTER_BLUE' && !isRedTurn);
 
   return (
-    <div className="min-h-screen bg-black flex flex-col text-gray-200 font-sans selection:bg-purple-500/30">
+    <div className="min-h-screen bg-black flex flex-col text-gray-200 font-sans selection:bg-purple-500/30 relative">
+      
+      {/* Notifications Container (Toast) */}
+      <div className="fixed top-24 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4">
+         {notifications.map(n => {
+             // Defensive check: ensure payload exists and is an object
+             if (!n.payload || typeof n.payload !== 'object') return null;
+             
+             const { nickname, role } = n.payload;
+             const safeRole = role || 'TABLE';
+             const safeNickname = nickname || 'Agente';
+
+             const message = `${safeNickname} se ha unido como ${safeRole === 'TABLE' ? 'MESA' : safeRole === 'SPYMASTER_RED' ? 'JEFE ROJO' : 'JEFE AZUL'}!`;
+             
+             let bgColor = "bg-purple-900/90";
+             let borderColor = "border-purple-400";
+             let shadowColor = "shadow-[0_0_20px_rgba(168,85,247,0.6)]";
+
+             switch (safeRole) {
+                case 'SPYMASTER_RED':
+                    bgColor = "bg-red-900/90";
+                    borderColor = "border-red-400";
+                    shadowColor = "shadow-[0_0_20px_rgba(239,68,68,0.6)]";
+                    break;
+                case 'SPYMASTER_BLUE':
+                    bgColor = "bg-blue-900/90";
+                    borderColor = "border-blue-400";
+                    shadowColor = "shadow-[0_0_20px_rgba(59,130,246,0.6)]";
+                    break;
+                case 'TABLE':
+                default:
+                    // Keep purple
+                    break;
+             }
+             return (
+                <div 
+                    key={n.id} 
+                    className={`${bgColor} ${borderColor} text-white ${shadowColor} px-6 py-3 rounded-full animate-bounce font-bold text-sm tracking-widest uppercase backdrop-blur-sm transition-all duration-300 border`}
+                >
+                    ⚡ {message}
+                </div>
+             );
+         })}
+      </div>
+
       {/* Cyberpunk Header */}
       <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 flex justify-between items-center sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
-        <div className="hidden sm:flex flex-col leading-none">
-          <span className="text-[10px] text-purple-500 tracking-[0.3em] font-bold">SALA</span>
-          <span className="font-mono text-white text-lg tracking-widest text-glow-purple">{roomId}</span>
+        <div className="hidden sm:flex items-center gap-4">
+          <div className="flex flex-col leading-none">
+            <span className="text-[10px] text-purple-500 tracking-[0.3em] font-bold">SALA</span>
+            <span className="font-mono text-white text-lg tracking-widest text-glow-purple">{roomId}</span>
+          </div>
         </div>
         
         {/* Scoreboard */}
@@ -157,6 +226,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         </div>
 
         <div className="flex gap-3 items-center">
+             {/* Nickname Display */}
+             <div className="hidden sm:block font-mono text-gray-500 uppercase text-xs tracking-wider border-r border-white/10 pr-3 mr-1">
+                 {nickname}
+             </div>
+
             <div className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border ${isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`}>
                 {isRedTurn ? 'TURNO ROJO' : 'TURNO AZUL'}
             </div>
@@ -169,8 +243,8 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         </div>
       </header>
 
-      {/* Status Bar */}
-      <div className="w-full bg-[#0a0a0a] border-b border-white/5 p-3 text-center relative overflow-hidden">
+      {/* Status Bar / Notifications */}
+      <div className="w-full bg-[#0a0a0a] border-b border-white/5 p-3 text-center relative overflow-hidden transition-all duration-300">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent"></div>
         
         {gameState.winner ? (
@@ -178,54 +252,54 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         ) : (
             <>
                 {gameState.phase === 'CLUE' ? (
-                    <div className="flex items-center justify-center min-h-[2.5rem]">
-                         {role === 'TABLE' && (
-                             <span className="text-purple-300 animate-pulse font-mono text-sm tracking-widest">[ ESPERANDO TRANSMISIÓN CIFRADA... ]</span>
-                         )}
-                         {!isMyTurn && role !== 'TABLE' && (
-                             <span className="text-gray-500 font-mono text-xs tracking-widest">ESPERANDO AL JEFE RIVAL</span>
-                         )}
-                         {isMyTurn && (
-                             <div className="flex items-center gap-4 justify-center animate-in fade-in slide-in-from-top-2">
-                                 <select 
-                                    value={clueNumber} 
-                                    onChange={(e) => setClueNumber(Number(e.target.value))}
-                                    className="bg-black border border-purple-500/50 text-purple-400 px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500"
-                                 >
-                                     {[1,2,3,4,5,6,7,8,9].map(n => (
-                                         <option key={n} value={n}>{n}</option>
-                                     ))}
-                                     <option value={0}>0</option>
-                                     <option value={-1}>∞</option>
-                                 </select>
-                                 <button 
-                                    onClick={handleGiveClue}
-                                    className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-1 rounded font-bold text-sm tracking-widest shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
-                                 >
-                                     TRANSMITIR
-                                 </button>
-                             </div>
-                         )}
-                    </div>
-                ) : (
-                    <div className="flex flex-col items-center">
-                        <div className="flex items-baseline gap-3">
-                            <span className="text-gray-500 text-[10px] font-mono uppercase tracking-[0.2em]">OBJETIVOS</span>
-                            <span className="text-3xl font-black text-white text-glow-purple font-mono">
-                                {gameState.currentClueNumber === -1 ? '∞' : gameState.currentClueNumber}
-                            </span>
+                        <div className="flex items-center justify-center min-h-[2.5rem] animate-in fade-in duration-300">
+                            {role === 'TABLE' && (
+                                <span className="text-purple-300 animate-pulse font-mono text-sm tracking-widest">[ ESPERANDO TRANSMISIÓN CIFRADA... ]</span>
+                            )}
+                            {!isMyTurn && role !== 'TABLE' && (
+                                <span className="text-gray-500 font-mono text-xs tracking-widest">ESPERANDO AL JEFE RIVAL</span>
+                            )}
+                            {isMyTurn && (
+                                <div className="flex items-center gap-4 justify-center animate-in fade-in slide-in-from-top-2">
+                                    <select 
+                                        value={clueNumber} 
+                                        onChange={(e) => setClueNumber(Number(e.target.value))}
+                                        className="bg-black border border-purple-500/50 text-purple-400 px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500"
+                                    >
+                                        {[1,2,3,4,5,6,7,8,9].map(n => (
+                                            <option key={n} value={n}>{n}</option>
+                                        ))}
+                                        <option value={0}>0</option>
+                                        <option value={-1}>∞</option>
+                                    </select>
+                                    <button 
+                                        onClick={handleGiveClue}
+                                        className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-1 rounded font-bold text-sm tracking-widest shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all"
+                                    >
+                                        TRANSMITIR
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        
-                        {role === 'TABLE' && (
-                            <button 
-                                onClick={handleEndTurn}
-                                className="mt-2 px-6 py-1 bg-transparent border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] text-xs font-bold rounded transition-all uppercase tracking-widest"
-                            >
-                                ABORTAR TURNO
-                            </button>
-                        )}
-                    </div>
-                )}
+                    ) : (
+                        <div className="flex flex-col items-center animate-in fade-in duration-300">
+                            <div className="flex items-baseline gap-3">
+                                <span className="text-gray-500 text-[10px] font-mono uppercase tracking-[0.2em]">OBJETIVOS</span>
+                                <span className="text-3xl font-black text-white text-glow-purple font-mono">
+                                    {gameState.currentClueNumber === -1 ? '∞' : gameState.currentClueNumber}
+                                </span>
+                            </div>
+                            
+                            {role === 'TABLE' && (
+                                <button 
+                                    onClick={handleEndTurn}
+                                    className="mt-2 px-6 py-1 bg-transparent border border-orange-500/50 text-orange-500 hover:bg-orange-500/10 hover:border-orange-500 hover:shadow-[0_0_15px_rgba(249,115,22,0.4)] text-xs font-bold rounded transition-all uppercase tracking-widest"
+                                >
+                                    ABORTAR TURNO
+                                </button>
+                            )}
+                        </div>
+                    )}
             </>
         )}
       </div>
