@@ -20,8 +20,8 @@ export interface GameState {
   winner: 'RED' | 'BLUE' | null;
   log: string[];
   spymasters: {
-    RED: string[]; // socket ids
-    BLUE: string[]; // socket ids
+    RED: { id: string, name: string }[];
+    BLUE: { id: string, name: string }[];
   };
 }
 

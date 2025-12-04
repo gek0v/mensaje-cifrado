@@ -64,7 +64,7 @@ export default function Home() {
             />
             <button 
               onClick={joinRoom}
-              className="px-6 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900"
+              className="px-4 py-3 bg-gray-800 text-white rounded-lg font-bold hover:bg-gray-900"
             >
               ENTRAR
             </button>

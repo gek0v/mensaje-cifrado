@@ -54,12 +54,12 @@ export default function Card({ card, role, onClick }: CardProps) {
       onClick={(!card.revealed && role === 'TABLE') ? onClick : undefined}
       className={`
         relative flex items-center justify-center 
-        w-full aspect-[4/3] rounded-lg border-b-4 
+        w-full h-full rounded-lg border-b-2 sm:border-b-4 
         ${bgColor} ${textColor} ${borderColor} ${opacity} ${cursor}
-        shadow-md font-bold text-sm sm:text-base md:text-xl select-none
+        shadow-md font-bold text-xs sm:text-sm md:text-lg lg:text-xl select-none overflow-hidden
       `}
     >
-      <span className="uppercase text-center px-2 break-words z-10">
+      <span className="uppercase text-center px-1 leading-tight z-10">
         {card.word}
       </span>
       

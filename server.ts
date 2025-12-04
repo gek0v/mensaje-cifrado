@@ -6,7 +6,7 @@ import { generateBoard, checkWinCondition, GameState } from "./lib/gameUtils";
 import { randomBytes } from "crypto";
 
 const dev = process.env.NODE_ENV !== "production";
-const hostname = "localhost";
+const hostname = "0.0.0.0";
 const port = 3000;
 // when using middleware `hostname` and `port` must be provided below
 const app = next({ dev, hostname, port });
@@ -62,7 +62,7 @@ app.prepare().then(() => {
         callback({ success: true, state: sanitizeState(initialState), hostSecret });
     });
 
-    socket.on("join_room", ({ roomId, role }: { roomId: string, role: 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE' }, callback) => {
+    socket.on("join_room", ({ roomId, role, nickname }: { roomId: string, role: 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE', nickname: string }, callback) => {
         const room = rooms.get(roomId);
         if (!room) {
             callback({ error: "Room not found" });
@@ -70,14 +70,19 @@ app.prepare().then(() => {
         }
         socket.join(roomId);
 
+        const playerObj = { id: socket.id, name: nickname };
+
         if (role === 'SPYMASTER_RED') {
-            room.spymasters.RED.push(socket.id);
+            room.spymasters.RED.push(playerObj);
         } else if (role === 'SPYMASTER_BLUE') {
-            room.spymasters.BLUE.push(socket.id);
+            room.spymasters.BLUE.push(playerObj);
         }
         
         // Send current state
         callback({ success: true, state: sanitizeState(room) });
+        
+        // Notify others (optional, but good for updating lists)
+        io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
     socket.on("give_clue", ({ roomId, number }: { roomId: string, number: number }) => {
@@ -187,12 +192,28 @@ app.prepare().then(() => {
     });
 
     socket.on("disconnect", () => {
-       // Handle cleanup if necessary (remove spymaster from lists)
-       // For now, simple
+       // Remove player from rooms
+       rooms.forEach((room, roomId) => {
+           let updated = false;
+           const redIdx = room.spymasters.RED.findIndex(p => p.id === socket.id);
+           if (redIdx !== -1) {
+               room.spymasters.RED.splice(redIdx, 1);
+               updated = true;
+           }
+           const blueIdx = room.spymasters.BLUE.findIndex(p => p.id === socket.id);
+           if (blueIdx !== -1) {
+               room.spymasters.BLUE.splice(blueIdx, 1);
+               updated = true;
+           }
+           
+           if (updated) {
+               io.to(roomId).emit("game_update", sanitizeState(room));
+           }
+       });
     });
   });
 
-  server.listen(port, () => {
+  server.listen(port, hostname, () => {
     console.log(`> Ready on http://${hostname}:${port}`);
   });
 });

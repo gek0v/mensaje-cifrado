@@ -11,7 +11,7 @@ interface BoardProps {
 
 export default function Board({ board, role, onCardClick }: BoardProps) {
   return (
-    <div className="grid grid-cols-5 gap-2 sm:gap-4 p-4 max-w-5xl mx-auto w-full">
+    <div className="flex-1 w-full grid grid-cols-5 grid-rows-5 gap-2 p-2 min-h-0">
       {board.map((card) => (
         <Card 
           key={card.id} 
