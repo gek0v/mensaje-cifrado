@@ -14,8 +14,6 @@ export default function Card({ card, role, onClick }: CardProps) {
   
   // Base styles for Dark / Cyberpunk Theme
   let baseClass = "bg-[#111] border-gray-800 text-gray-300 shadow-sm"; // Default unrevealed state
-  let overlayClass = "";
-  let textClass = "";
 
   if (showColor) {
     switch (card.type) {

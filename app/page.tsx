@@ -6,13 +6,14 @@ import { io } from 'socket.io-client';
 
 export default function Home() {
   const [roomId, setRoomId] = useState('');
+  const [gameMode, setGameMode] = useState<'STANDARD' | 'NEURAL_LINK'>('STANDARD');
   const router = useRouter();
 
   const createRoom = () => {
     const socket = io(); 
     const newRoomId = Math.random().toString(36).substring(2, 6).toUpperCase();
     
-    socket.emit('create_room', newRoomId, (response: any) => {
+    socket.emit('create_room', newRoomId, gameMode, (response: { success: boolean; hostSecret?: string }) => {
         if (response.success) {
             if (response.hostSecret) {
                 sessionStorage.setItem(`host_secret_${newRoomId}`, response.hostSecret);
@@ -37,11 +38,29 @@ export default function Home() {
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-black to-black z-0 pointer-events-none"></div>
       
       <div className="z-10 flex flex-col items-center w-full max-w-md">
-        <h1 className="text-6xl font-black mb-12 text-transparent bg-clip-text bg-gradient-to-br from-purple-400 to-purple-700 tracking-tighter text-glow-purple">
+        <h1 className="text-6xl font-black mb-12 text-center text-transparent bg-clip-text bg-gradient-to-br from-purple-400 to-purple-700 tracking-tighter text-glow-purple">
           CÓDIGO<br/>SECRETO
         </h1>
         
         <div className="glass-panel p-8 rounded-2xl w-full box-glow-purple border border-white/5">
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={() => setGameMode('STANDARD')}
+              className={`px-4 py-2 rounded-l-lg font-bold text-sm transition-all ${
+                gameMode === 'STANDARD' ? 'bg-purple-600 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
+              }`}
+            >
+              MODO CLÁSICO
+            </button>
+            <button
+              onClick={() => setGameMode('NEURAL_LINK')}
+              className={`px-4 py-2 rounded-r-lg font-bold text-sm transition-all ${
+                gameMode === 'NEURAL_LINK' ? 'bg-purple-600 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
+              }`}
+            >
+              ENLACE NEURAL
+            </button>
+          </div>
           <button 
             onClick={createRoom}
             className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold text-xl hover:bg-purple-500 hover:shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all transform active:scale-95 tracking-widest border border-purple-400/30"

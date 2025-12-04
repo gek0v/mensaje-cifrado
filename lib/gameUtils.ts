@@ -24,6 +24,11 @@ export interface GameState {
     RED: { id: string, name: string }[];
     BLUE: { id: string, name: string }[];
   };
+  // New properties for Neural Link mode
+  gameMode: 'STANDARD' | 'NEURAL_LINK';
+  timer: number; // Seconds remaining
+  timerActive: boolean;
+  maxTime: number; // Initial time in seconds
 }
 
 export const TOTAL_CARDS = 25;

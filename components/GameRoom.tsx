@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState } from '@/lib/gameUtils';
 import Board from './Board';
+import { useRouter } from 'next/navigation';
 
 interface GameRoomProps {
   roomId: string;
@@ -16,32 +17,44 @@ let socket: Socket; // Keeping module scope for simplicity as handlers need it, 
 // Actually, let's move it to a ref inside component to be 100% safe against race conditions.
 
 export default function GameRoom({ roomId }: GameRoomProps) {
-  const socketRef = useState<Socket | null>(null); // Actually useState is fine or useRef. Let's use a module var pattern but safe.
-  // Reverting to module var is risky if multiple components. 
-  // Let's stick to the current pattern but add logging and slightly better UI.
+  // const socketRef = useState<Socket | null>(null); // Removed unused socketRef
   
   const [role, setRole] = useState<Role>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [nickname, setNickname] = useState('');
+  const [nickname, setNickname] = useState(() => `Agente ${Math.floor(1000 + Math.random() * 9000)}`);
   const [notifications, setNotifications] = useState<{id: number, payload: NotificationPayload}[]>([]);
   const [clueNumber, setClueNumber] = useState<number>(1);
   const [isHost, setIsHost] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
-    setNickname(`Agente ${Math.floor(1000 + Math.random() * 9000)}`);
     const secret = sessionStorage.getItem(`host_secret_${roomId}`);
-    setIsHost(!!secret);
+    const newIsHost = !!secret;
+    if (newIsHost !== isHost) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsHost(newIsHost);
+    }
 
     // Initialize socket only once if possible, or handle cleanup properly
     socket = io();
     
     socket.on('connect', () => {
         console.log("Connected to server");
+        // Get initial state to know mode
+        socket.emit('get_room_state', roomId, (response: { success: boolean; state?: GameState }) => {
+            if (response.success && response.state) {
+                setGameState(response.state);
+            }
+        });
     });
 
     socket.on('game_update', (newState: GameState) => setGameState(newState));
+    
+    // Listen for timer update (lighter payload)
+    socket.on('timer_update', (time: number) => {
+        setGameState(prev => prev ? { ...prev, timer: time } : null);
+    });
     
     // Listen for notification (can be string or object payload)
     socket.on('notification', (payload: NotificationPayload | string) => {
@@ -61,15 +74,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     return () => { 
         socket.disconnect(); 
     };
-  }, [roomId]);
+  }, [roomId, isHost]);
 
   const handleJoin = (selectedRole: Role) => {
     if (!selectedRole) return;
     if (!nickname.trim()) { setError("Requerido"); return; }
-    setLoading(true);
     
-    socket.emit('join_room', { roomId, role: selectedRole, nickname }, (response: any) => {
-      setLoading(false);
+    socket.emit('join_room', { roomId, role: selectedRole, nickname }, (response: { success: boolean; state?: GameState; error?: string }) => {
       if (response.success) {
         setRole(selectedRole);
         setGameState(response.state);
@@ -96,6 +107,17 @@ export default function GameRoom({ roomId }: GameRoomProps) {
 
   const handleEndTurn = () => {
       socket.emit('end_turn', roomId);
+  };
+
+  const handleChangeRole = () => {
+      socket.emit('leave_role', { roomId, currentRole: role, nickname });
+      setRole(null);
+      setGameState(null);
+  };
+
+  const handleGoToHome = () => {
+      socket.emit('leave_room', { roomId, nickname });
+      router.push('/');
   };
 
   if (!role) {
@@ -139,18 +161,33 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 <div className="grid grid-cols-2 gap-4 mt-2">
                 <button 
                     onClick={() => handleJoin('SPYMASTER_RED')}
-                    className="p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all font-bold"
+                    className={`p-4 bg-red-950/30 border border-red-900/50 text-red-400 rounded-xl hover:bg-red-900/50 hover:border-red-500 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all font-bold ${gameState?.gameMode === 'NEURAL_LINK' ? 'col-span-2' : ''}`}
                 >
                     JEFE ROJO
                 </button>
-                <button 
-                    onClick={() => handleJoin('SPYMASTER_BLUE')}
-                    className="p-4 bg-blue-950/30 border border-blue-900/50 text-blue-400 rounded-xl hover:bg-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all font-bold"
-                >
-                    JEFE AZUL
-                </button>
+                {gameState?.gameMode !== 'NEURAL_LINK' && (
+                    <button 
+                        onClick={() => handleJoin('SPYMASTER_BLUE')}
+                        className="p-4 bg-blue-950/30 border border-blue-900/50 text-blue-400 rounded-xl hover:bg-blue-900/50 hover:border-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.2)] transition-all font-bold"
+                    >
+                        JEFE AZUL
+                    </button>
+                )}
                 </div>
             </div>
+
+            <div className="relative flex py-4 items-center">
+                <div className="flex-grow border-t border-white/10"></div>
+                <span className="flex-shrink mx-4 text-gray-500 font-mono text-xs">REGRESAR</span>
+                <div className="flex-grow border-t border-white/10"></div>
+            </div>
+
+            <button
+                onClick={() => router.push('/')}
+                className="w-full py-3 bg-gray-700/50 text-gray-300 rounded-xl font-bold text-lg hover:bg-gray-600/70 hover:shadow-[0_0_15px_rgba(156,163,175,0.2)] transition-all transform active:scale-95 tracking-widest border border-gray-500/30"
+            >
+                PANTALLA INICIAL
+            </button>
           </div>
         </div>
       </div>
@@ -210,7 +247,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       </div>
 
       {/* Cyberpunk Header */}
-      <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 flex justify-between items-center sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+      <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 grid grid-cols-3 items-center sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
         <div className="hidden sm:flex items-center gap-4">
           <div className="flex flex-col leading-none">
             <span className="text-[10px] text-purple-500 tracking-[0.3em] font-bold">SALA</span>
@@ -218,30 +255,58 @@ export default function GameRoom({ roomId }: GameRoomProps) {
           </div>
         </div>
         
-        {/* Scoreboard */}
-        <div className="flex items-center gap-6 sm:gap-12 flex-1 justify-center relative">
-            <div className={`text-3xl font-black transition-all duration-500 ${isRedTurn ? 'text-red-500 text-glow-red scale-110' : 'text-red-900 blur-[1px]'}`}>
-                {gameState.redScore}
-            </div>
-            <div className="h-8 w-px bg-white/10 rotate-12"></div>
-            <div className={`text-3xl font-black transition-all duration-500 ${!isRedTurn ? 'text-blue-500 text-glow-blue scale-110' : 'text-blue-900 blur-[1px]'}`}>
-                {gameState.blueScore}
-            </div>
-            
-            {/* Active Turn Indicator Underline */}
-            <div className={`absolute -bottom-6 h-0.5 w-20 bg-current transition-all duration-500 ${isRedTurn ? 'text-red-500 -translate-x-8' : 'text-blue-500 translate-x-8'}`}></div>
+        {/* Scoreboard or Timer */}
+        <div className="flex items-center gap-6 sm:gap-12 justify-center relative">
+            {gameState.gameMode === 'NEURAL_LINK' ? (
+                <div className={`text-4xl font-mono font-black tracking-widest ${gameState.timer < 30 ? 'text-red-500 animate-pulse drop-shadow-[0_0_10px_red]' : 'text-purple-400 text-glow-purple'}`}>
+                    {Math.floor(gameState.timer / 60)}:{(gameState.timer % 60).toString().padStart(2, '0')}
+                </div>
+            ) : (
+                <>
+                    <div className={`text-3xl font-black transition-all duration-500 ${isRedTurn ? 'text-red-500 text-glow-red scale-110' : 'text-red-900 blur-[1px]'}`}>
+                        {gameState.redScore}
+                    </div>
+                    <div className="h-8 w-px bg-white/10 rotate-12"></div>
+                    <div className={`text-3xl font-black transition-all duration-500 ${!isRedTurn ? 'text-blue-500 text-glow-blue scale-110' : 'text-blue-900 blur-[1px]'}`}>
+                        {gameState.blueScore}
+                    </div>
+                    
+                    {/* Active Turn Indicator Underline */}
+                    <div className={`absolute -bottom-6 h-0.5 w-20 bg-current transition-all duration-500 ${isRedTurn ? 'text-red-500 -translate-x-8' : 'text-blue-500 translate-x-8'}`}></div>
+                </>
+            )}
         </div>
 
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center justify-end">
              {/* Nickname Display */}
              <div className="hidden sm:block font-mono text-gray-500 uppercase text-xs tracking-wider border-r border-white/10 pr-3 mr-1">
                  {nickname}
              </div>
 
-            <div className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border ${isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'}`}>
-                {isRedTurn ? 'TURNO ROJO' : 'TURNO AZUL'}
+            <div className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border ${
+                gameState.gameMode === 'NEURAL_LINK' 
+                ? 'bg-purple-500/10 border-purple-500 text-purple-500 shadow-[0_0_10px_rgba(168,85,247,0.3)]'
+                : isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+            }`}>
+                {gameState.gameMode === 'NEURAL_LINK' ? 'ENLACE ACTIVO' : (isRedTurn ? 'TURNO ROJO' : 'TURNO AZUL')}
             </div>
             
+            {/* New buttons for changing role and returning home */}
+            <button 
+                onClick={handleChangeRole} 
+                className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-purple-600/50 border border-white/10 rounded-full text-white transition-all text-sm"
+                title="Cambiar Rol"
+            >
+                👥
+            </button>
+            <button 
+                onClick={handleGoToHome} 
+                className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-red-600/50 border border-white/10 rounded-full text-white transition-all text-sm"
+                title="Salir de la partida"
+            >
+                🏠
+            </button>
+
             {isHost && (
                 <button onClick={handleReset} className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white transition-all">
                     ↺

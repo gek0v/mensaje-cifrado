@@ -19,7 +19,8 @@ interface ServerGameState extends GameState {
 const rooms = new Map<string, ServerGameState>();
 
 function sanitizeState(state: ServerGameState): GameState {
-    const { hostSecret, ...publicState } = state;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { hostSecret: _hostSecret, ...publicState } = state;
     return publicState;
 }
 
@@ -31,10 +32,33 @@ app.prepare().then(() => {
 
   const io = new Server(server);
 
+  // Global Timer Loop
+  setInterval(() => {
+    rooms.forEach((room, roomId) => {
+        if (room.gameMode === 'NEURAL_LINK' && room.timerActive && !room.winner) {
+            room.timer -= 1;
+            
+            if (room.timer <= 0) {
+                room.timer = 0;
+                room.timerActive = false;
+                room.winner = 'BLUE'; // System wins (Blue represents System/Time in this mode context usually, or just 'BLUE' as enemy)
+                room.log.push("TIME OVER! SYSTEM WINS!");
+                io.to(roomId).emit("game_update", sanitizeState(room));
+            } else {
+                // Optimize: Only emit time every second might be too much traffic if many rooms. 
+                // But for now it's fine. Ideally emit only on significant changes or let client interpolate.
+                // We will emit full state for simplicity to keep clients in sync.
+                // To reduce bandwidth, we could emit a specific 'timer_tick' event.
+                 io.to(roomId).emit("timer_update", room.timer);
+            }
+        }
+    });
+  }, 1000);
+
   io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
 
-    socket.on("create_room", (roomId: string, callback) => {
+    socket.on("create_room", (roomId: string, mode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD', callback) => {
         if (rooms.has(roomId)) {
             callback({ error: "Room already exists" });
             return;
@@ -44,10 +68,12 @@ app.prepare().then(() => {
         const blueTotal = board.filter(c => c.type === 'BLUE').length;
         const hostSecret = randomBytes(16).toString('hex');
         
+        const defaultMaxTime = 180; // 3 minutes for Neural Link mode
+
         const initialState: ServerGameState = {
             roomId,
             board,
-            turn: startingTeam,
+            turn: startingTeam, // In Neural Link, usually Red starts, but let's keep random for now or force RED? Let's force RED for Neural Link usually.
             phase: 'CLUE',
             currentClueNumber: null,
             currentGuessesCount: 0,
@@ -56,8 +82,18 @@ app.prepare().then(() => {
             winner: null,
             log: [`Game started! Team ${startingTeam} starts.`],
             spymasters: { RED: [], BLUE: [] },
-            hostSecret
+            hostSecret,
+            gameMode: mode,
+            timer: mode === 'NEURAL_LINK' ? defaultMaxTime : 0,
+            timerActive: false,
+            maxTime: defaultMaxTime,
         };
+        
+        // Force RED start for Neural Link single player feel
+        if (mode === 'NEURAL_LINK') {
+            initialState.turn = 'RED'; 
+        }
+
         rooms.set(roomId, initialState);
         socket.join(roomId);
         callback({ success: true, state: sanitizeState(initialState), hostSecret });
@@ -87,6 +123,15 @@ app.prepare().then(() => {
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
+    socket.on("get_room_state", (roomId: string, callback) => {
+        const room = rooms.get(roomId);
+        if (!room) {
+            callback({ error: "Room not found" });
+            return;
+        }
+        callback({ success: true, state: sanitizeState(room) });
+    });
+
     socket.on("give_clue", ({ roomId, number }: { roomId: string, number: number }) => {
         const room = rooms.get(roomId);
         if (!room || room.phase !== 'CLUE') return;
@@ -96,6 +141,12 @@ app.prepare().then(() => {
         room.phase = 'GUESSING';
         room.log.push(`Clue given! Max words: ${number}`);
         
+        // Start timer in Neural Link if not active
+        if (room.gameMode === 'NEURAL_LINK' && !room.timerActive) {
+            room.timerActive = true;
+            room.log.push("NEURAL LINK ESTABLISHED. TIMER STARTED.");
+        }
+        
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
@@ -103,11 +154,23 @@ app.prepare().then(() => {
         const room = rooms.get(roomId);
         if (!room || room.phase !== 'GUESSING') return;
 
-        room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
-        room.phase = 'CLUE';
-        room.currentClueNumber = null;
-        room.currentGuessesCount = 0;
-        room.log.push(`Turn ended manually. Now it's ${room.turn}'s turn.`);
+        // In Neural Link, "End Turn" might just mean "Stop Guessing" but turn stays with RED? 
+        // Or maybe it passes to "System"? 
+        // For Speedrun mode described: "No hay turnos rivales". 
+        // So End Turn just goes back to Giving Clue phase.
+        
+        if (room.gameMode === 'NEURAL_LINK') {
+            room.phase = 'CLUE';
+            room.currentClueNumber = null;
+            room.currentGuessesCount = 0;
+            room.log.push(`Transmission ended. New clue required.`);
+        } else {
+            room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
+            room.phase = 'CLUE';
+            room.currentClueNumber = null;
+            room.currentGuessesCount = 0;
+            room.log.push(`Turn ended manually. Now it's ${room.turn}'s turn.`);
+        }
 
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
@@ -131,47 +194,71 @@ app.prepare().then(() => {
 
         // Logic for turn handling
         if (card.type === 'ASSASSIN') {
-            room.winner = room.turn === 'RED' ? 'BLUE' : 'RED';
-            room.log.push(`ASSASSIN HIT! ${room.winner} WINS!`);
+            room.winner = room.turn === 'RED' ? 'BLUE' : 'RED'; // In Neural Link, if RED hits assassin, BLUE (System) wins.
+            room.timerActive = false;
+            room.log.push(`ASSASSIN HIT! SYSTEM FAILURE!`);
             turnEnded = true;
-        } else if (card.type === 'NEUTRAL') {
-            room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
-            room.log.push(`Neutral card. Turn passes to ${room.turn}.`);
-            turnEnded = true;
-        } else if (card.type !== room.turn) {
-             // Picked opponent's card
-             room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
-             room.log.push(`Opponent's card! Turn passes to ${room.turn}.`);
-             
-             // Check if opponent won by this
-             const win = checkWinCondition(room);
-             if (win) {
-                 room.winner = win;
-                 room.log.push(`${win} WINS!`);
-             }
-             turnEnded = true;
+        } else if (room.gameMode === 'NEURAL_LINK') {
+            // Neural Link Logic
+            if (card.type === 'NEUTRAL') {
+                const penalty = 30;
+                room.timer = Math.max(0, room.timer - penalty);
+                room.log.push(`Neutral noise encountered. Time penalty: -${penalty}s`);
+                // Do NOT end turn, just penalize
+            } else if (card.type !== room.turn) { // Opponent (Blue) in Neural Link
+                 const penalty = 60;
+                 room.timer = Math.max(0, room.timer - penalty);
+                 room.log.push(`Enemy firewall hit! Time penalty: -${penalty}s`);
+                 // Do NOT end turn, just penalize
+            } else {
+                // Correct guess
+                room.currentGuessesCount++;
+                const win = checkWinCondition(room);
+                if (win) {
+                    room.winner = win;
+                    room.timerActive = false;
+                    room.log.push(`${win} WINS! NEURAL LINK SECURE.`);
+                    turnEnded = true;
+                }
+                // No limit check enforced in speedrun usually, but we can keep the N+1 rule if desired.
+                // For now, let's allow infinite guesses until time runs out or user stops.
+            }
         } else {
-            // Correct guess
-             room.currentGuessesCount++;
-             const win = checkWinCondition(room);
-             if (win) {
-                 room.winner = win;
-                 room.log.push(`${win} WINS!`);
-                 turnEnded = true; // Game over is effectively a turn end
-             } else {
-                 // Check limit (N rules) - User asked to be exactly N
-                 // If currentClueNumber is > 0, limit is N.
-                 // BUT user asked: "Once N words selected also change turn even if correct" -> Wait, "Una vez seleccionadas las N palabras también cambia de turno aunque hayas acertado todas"
-                 // So if guesses == clueNumber, turn ends.
-                 if (room.currentClueNumber && room.currentClueNumber > 0) {
-                     if (room.currentGuessesCount >= room.currentClueNumber) {
-                         room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
-                         room.log.push(`Max guesses reached (${room.currentClueNumber}). Turn passes.`);
-                         turnEnded = true;
-                     }
-                 }
-             }
-             // Turn continues if not won and limit not reached
+            // Standard Logic
+            if (card.type === 'NEUTRAL') {
+                room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
+                room.log.push(`Neutral card. Turn passes to ${room.turn}.`);
+                turnEnded = true;
+            } else if (card.type !== room.turn) {
+                // Picked opponent's card
+                room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
+                room.log.push(`Opponent's card! Turn passes to ${room.turn}.`);
+                
+                // Check if opponent won by this
+                const win = checkWinCondition(room);
+                if (win) {
+                    room.winner = win;
+                    room.log.push(`${win} WINS!`);
+                }
+                turnEnded = true;
+            } else {
+                // Correct guess
+                room.currentGuessesCount++;
+                const win = checkWinCondition(room);
+                if (win) {
+                    room.winner = win;
+                    room.log.push(`${win} WINS!`);
+                    turnEnded = true; // Game over is effectively a turn end
+                } else {
+                    if (room.currentClueNumber && room.currentClueNumber > 0) {
+                        if (room.currentGuessesCount >= room.currentClueNumber) {
+                            room.turn = room.turn === 'RED' ? 'BLUE' : 'RED';
+                            room.log.push(`Max guesses reached (${room.currentClueNumber}). Turn passes.`);
+                            turnEnded = true;
+                        }
+                    }
+                }
+            }
         }
 
         if (turnEnded && !room.winner) {
