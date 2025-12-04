@@ -82,11 +82,11 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     if (!nickname.trim()) { setError("Requerido"); return; }
     
     socket.emit('join_room', { roomId, role: selectedRole, nickname }, (response: { success: boolean; state?: GameState; error?: string }) => {
-      if (response.success) {
+      if (response.success && response.state) {
         setRole(selectedRole);
         setGameState(response.state);
       } else {
-        setError(response.error === 'Room not found' ? "Sala no encontrada" : response.error);
+        setError(response.error === 'Room not found' ? "Sala no encontrada" : (response.error || 'Error desconocido'));
       }
     });
   };
@@ -400,9 +400,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                                             <select 
                                                 value={clueNumber} 
                                                 onChange={(e) => setClueNumber(Number(e.target.value))}
-                                                className={`bg-black border ${
-                                                    gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/50 text-emerald-400' : 'border-purple-500/50 text-purple-400'
-                                                } px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500`}
+                                                className="bg-black border border-purple-500/50 text-purple-400 px-4 py-1 rounded font-mono font-bold focus:outline-none focus:border-purple-500"
                                             >
                                                 {[1,2,3,4,5,6,7,8,9].map(n => (
                                                     <option key={n} value={n}>{n}</option>
@@ -412,11 +410,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                                             </select>
                                             <button 
                                                 onClick={handleGiveClue}
-                                                className={`px-6 py-1 text-white rounded font-bold text-sm tracking-widest transition-all ${
-                                                    gameState?.gameMode === 'NEURAL_LINK'
-                                                        ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
-                                                        : 'bg-purple-600 hover:bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]'
-                                                }`}
+                                                className="px-6 py-1 text-white rounded font-bold text-sm tracking-widest transition-all bg-purple-600 hover:bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)]"
                                             >
                                                 TRANSMITIR
                                             </button>
