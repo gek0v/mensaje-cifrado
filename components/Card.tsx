@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import { Card as CardType } from "@/lib/gameUtils";
 
 interface CardProps {
@@ -9,9 +10,31 @@ interface CardProps {
 }
 
 export default function Card({ card, role, onClick }: CardProps) {
+  const [isShaking, setIsShaking] = useState(false);
+  const [showExplosion, setShowExplosion] = useState(false); // New state for explosion
   const isSpymaster = role.includes('SPYMASTER');
   const showColor = card.revealed || isSpymaster;
   
+  useEffect(() => {
+    if (card.type === 'ASSASSIN' && card.revealed) {
+      setShowExplosion(true);
+      // Hide explosion effect after a short duration
+      const timer = setTimeout(() => setShowExplosion(false), 1000); // 1 second for the animation
+      return () => clearTimeout(timer);
+    }
+  }, [card.type, card.revealed]);
+  
+  const handleCardClick = () => {
+    if (!card.revealed && role === 'TABLE') {
+      setIsShaking(true);
+      // Wait for shake animation, then trigger actual click and reset shake
+      setTimeout(() => {
+        onClick();
+        setIsShaking(false);
+      }, 300); 
+    }
+  };
+
   // Base styles for Dark / Cyberpunk Theme
   let baseClass = "bg-[#111] border-gray-800 text-gray-300 shadow-sm"; // Default unrevealed state
 
@@ -55,11 +78,11 @@ export default function Card({ card, role, onClick }: CardProps) {
 
   return (
     <div 
-      onClick={(!card.revealed && role === 'TABLE') ? onClick : undefined}
+      onClick={handleCardClick}
       className={`
         relative flex items-center justify-center 
         w-full h-full rounded-xl border
-        ${baseClass} ${cursor} ${revealedOpacity}
+        ${baseClass} ${cursor} ${revealedOpacity} ${isShaking ? 'animate-shake' : ''}
         font-bold text-xs sm:text-sm md:text-lg select-none overflow-hidden
         transition-all duration-200
       `}
@@ -81,6 +104,13 @@ export default function Card({ card, role, onClick }: CardProps) {
           <div className="absolute inset-0 flex items-center justify-center opacity-20 pointer-events-none">
               <span className="text-6xl">☠</span>
           </div>
+      )}
+
+      {/* Assassin Explosion Effect */}
+      {showExplosion && card.type === 'ASSASSIN' && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+          <div className="w-full h-full bg-radial-gradient-fuchsia opacity-0 animate-assassin-explode"></div>
+        </div>
       )}
     </div>
   );

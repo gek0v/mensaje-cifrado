@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameState } from '@/lib/gameUtils';
 import Board from './Board';
@@ -30,7 +30,27 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const [showTimeMenu, setShowTimeMenu] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // New state for mute control
   const router = useRouter();
+
+  const prevGameStateRef = useRef<GameState | null>(null); // New useRef for previous state
+
+  const soundPaths = {
+    clue: '/sounds/clue.mp3',
+    correct: '/sounds/correct.mp3',
+    wrong: '/sounds/wrong.mp3',
+    neutral: '/sounds/neutral.mp3',
+    assassin: '/sounds/assassin.mp3',
+    win: '/sounds/win.mp3',
+    lose: '/sounds/lose.mp3',
+    // Add other sounds as needed
+  };
+
+  const playSound = (soundKey: keyof typeof soundPaths) => {
+    if (isMuted) return;
+    const audio = new Audio(soundPaths[soundKey]);
+    audio.play().catch(e => console.error("Error playing sound:", e));
+  };
 
   const handleCopyLink = async () => {
       try {
@@ -84,7 +104,35 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         });
     });
 
-    socket.on('game_update', (newState: GameState) => setGameState(newState));
+    socket.on('game_update', (newState: GameState) => {
+        // Handle sound effects based on state changes
+        if (prevGameStateRef.current) {
+            // Check for card flips
+            const revealedCards = newState.board.filter(card => card.revealed && !prevGameStateRef.current?.board.find(prevCard => prevCard.id === card.id)?.revealed);
+            revealedCards.forEach(card => {
+                if (card.type === 'ASSASSIN') {
+                    playSound('assassin');
+                } else if (card.type === 'NEUTRAL') {
+                    playSound('neutral');
+                } else if (card.type === newState.turn) { // Correct guess for current turn
+                    playSound('correct');
+                } else { // Wrong guess (opponent's card)
+                    playSound('wrong');
+                }
+            });
+
+            // Check for winner
+            if (!prevGameStateRef.current.winner && newState.winner) {
+                if (newState.winner === role?.split('_')[1] || (role === 'TABLE' && newState.winner === 'BLUE')) { // Simplified win condition for player
+                    playSound('win');
+                } else {
+                    playSound('lose');
+                }
+            }
+        }
+        setGameState(newState);
+        prevGameStateRef.current = newState; // Update previous state
+    });
     
     // Listen for timer update (lighter payload)
     socket.on('timer_update', (time: number) => {
@@ -140,6 +188,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const handleGiveClue = () => {
       if (!gameState) return;
       socket.emit('give_clue', { roomId, number: clueNumber });
+      playSound('clue');
   };
 
   const handleEndTurn = () => {
@@ -164,6 +213,12 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       setShowTimeMenu(false);
   };
 
+  // Initial loading state while we fetch game state
+  if (!gameState) {
+      return <div className="flex justify-center items-center min-h-screen bg-black text-purple-500 font-mono animate-pulse">CONECTANDO AL SISTEMA...</div>;
+  }
+
+  // If gameState is available, but no role selected, show the join menu
   if (!role) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
@@ -257,9 +312,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const isRedTurn = gameState.turn === 'RED';
   const winnerColor = gameState.winner === 'RED' ? 'text-red-500' : 'text-blue-500';
   const isMyTurn = (role === 'SPYMASTER_RED' && isRedTurn) || (role === 'SPYMASTER_BLUE' && !isRedTurn);
+  const showGlitchEffect = gameState.gameMode === 'NEURAL_LINK' && gameState.timer <= 30;
 
   return (
-    <div className="min-h-screen bg-black flex flex-col text-gray-200 font-sans selection:bg-purple-500/30 relative">
+    <div className={`min-h-screen bg-black flex flex-col text-gray-200 font-sans selection:bg-purple-500/30 relative ${showGlitchEffect ? 'glitch-effect' : ''}`}>
       
       {/* Notifications Container (Toast) */}
       <div className="fixed top-24 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4">
@@ -312,7 +368,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       </div>
 
       {/* Cyberpunk Header */}
-      <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 grid grid-cols-3 items-center sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
+      <header className="bg-black/80 backdrop-blur-md border-b border-white/5 p-2 sm:p-4 flex justify-between items-center sm:grid sm:grid-cols-3 sticky top-0 z-50 h-16 shadow-[0_4px_20px_rgba(0,0,0,0.5)]">
         <div className="hidden sm:flex items-center gap-4">
           <div className="flex flex-col leading-none">
             <span className={`text-[10px] tracking-[0.3em] font-bold ${
@@ -325,7 +381,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
         </div>
         
         {/* Scoreboard or Timer */}
-        <div className="flex items-center gap-6 sm:gap-12 justify-center relative">
+        <div className="flex items-center gap-6 sm:gap-12 justify-center relative flex-grow">
             {gameState.gameMode === 'NEURAL_LINK' ? (
                 <div className={`text-4xl font-mono font-black tracking-widest ${gameState.timer < 30 ? 'text-red-500 animate-pulse drop-shadow-[0_0_10px_red]' : 'text-purple-400 text-glow-purple'}`}>
                     {Math.floor(gameState.timer / 60)}:{(gameState.timer % 60).toString().padStart(2, '0')}
@@ -346,7 +402,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             )}
         </div>
 
-        <div className="flex gap-3 items-center justify-end">
+        <div className="flex gap-1 sm:gap-3 items-center justify-end flex-shrink-0">
              {/* Nickname Display */}
              <div className="hidden sm:block font-mono text-gray-500 uppercase text-xs tracking-wider border-r border-white/10 pr-3 mr-1">
                  {nickname}
@@ -393,6 +449,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 title="Cambiar Rol"
             >
                 👥
+            </button>
+            <button 
+                onClick={() => setIsMuted(prev => !prev)}
+                className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-gray-600/50 border border-white/10 rounded-full text-white transition-all text-sm"
+                title={isMuted ? "Activar Sonido" : "Silenciar Sonido"}
+            >
+                {isMuted ? '🔇' : '🔊'}
             </button>
             <button 
                 onClick={handleGoToHome} 
