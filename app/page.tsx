@@ -44,7 +44,7 @@ export default function Home() {
             ? 'bg-gradient-to-br from-emerald-400 to-emerald-700 text-glow-emerald' 
             : 'bg-gradient-to-br from-purple-400 to-purple-700 text-glow-purple'
         } tracking-tighter`}>
-          CÓDIGO<br/>SECRETO
+          MENSAJE<br/>CIFRADO
         </h1>
         
         <div className={`glass-panel p-8 rounded-2xl w-full border border-white/5 ${

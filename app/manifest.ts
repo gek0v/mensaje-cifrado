@@ -2,9 +2,9 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Código Secreto',
-    short_name: 'Código Secreto',
-    description: 'Juego de espías multijugador en tiempo real',
+    name: 'Mensaje Cifrado',
+    short_name: 'Mensaje Cifrado',
+    description: 'Juego de mesa multijugador en tiempo real',
     start_url: '/',
     display: 'standalone',
     background_color: '#1a1a1a',

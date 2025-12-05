@@ -1,6 +1,6 @@
-# Código Secreto - Juego en Tiempo Real
+# Mensaje Cifrado - Juego en Tiempo Real
 
-Este proyecto es una implementación digital avanzada del juego de mesa "Código Secreto" (Codenames), optimizada para jugar con amigos usando múltiples dispositivos. Desarrollado con **Next.js**, **Socket.io** y **Bun**.
+Este proyecto es una implementación digital avanzada del juego de mesa "Mensaje Cifrado" (inspirado en Codenames), optimizada para jugar con amigos usando múltiples dispositivos. Desarrollado con **Next.js**, **Socket.io** y **Bun**.
 
 🔗 **Juega ahora:** [https://mensaje-cifrado.onrender.com](https://mensaje-cifrado.onrender.com)
 

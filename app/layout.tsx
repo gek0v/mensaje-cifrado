@@ -13,12 +13,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Código Secreto",
-  description: "Juego de espías multijugador",
+  title: "Mensaje Cifrado",
+  description: "Juego de mesa multijugador en tiempo real",
+  manifest: "/manifest.webmanifest",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
   appleWebApp: {
-    capable: true,
+    title: "Mensaje Cifrado",
     statusBarStyle: "black-translucent",
-    title: "Código Secreto",
+    capable: true,
   },
 };
 
