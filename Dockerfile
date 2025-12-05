@@ -42,9 +42,6 @@ RUN bun install --frozen-lockfile --production
 COPY --from=base /app/server.ts ./server.ts
 COPY --from=base /app/lib ./lib
 
-# Change ownership
-RUN chown -R nextjs:nodejs /app
-
 USER nextjs
 
 EXPOSE 3000
