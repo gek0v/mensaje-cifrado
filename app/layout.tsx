@@ -16,7 +16,6 @@ export const metadata: Metadata = {
   title: "Mensaje Cifrado",
   description: "Juego de mesa multijugador en tiempo real",
   manifest: "/manifest.webmanifest",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
   appleWebApp: {
     title: "Mensaje Cifrado",
     statusBarStyle: "black-translucent",
