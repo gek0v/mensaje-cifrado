@@ -33,8 +33,12 @@ RUN adduser --system --uid 1001 nextjs
 # Copy necessary files
 COPY --from=base /app/public ./public
 COPY --from=base /app/.next ./.next
-COPY --from=base /app/node_modules ./node_modules
 COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/bun.lock ./bun.lock
+
+# Install only production dependencies
+RUN bun install --frozen-lockfile --production
+
 COPY --from=base /app/server.ts ./server.ts
 COPY --from=base /app/lib ./lib
 
