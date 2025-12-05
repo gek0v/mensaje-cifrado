@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { GameState } from '@/lib/gameUtils';
 import Board from './Board';
 import { useRouter } from 'next/navigation';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface GameRoomProps {
   roomId: string;
@@ -27,7 +28,19 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const [clueNumber, setClueNumber] = useState<number>(1);
   const [isHost, setIsHost] = useState(false);
   const [showTimeMenu, setShowTimeMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const router = useRouter();
+
+  const handleCopyLink = async () => {
+      try {
+          await navigator.clipboard.writeText(window.location.href);
+          setCopySuccess(true);
+          setTimeout(() => setCopySuccess(false), 2000);
+      } catch (err) {
+          console.error('Failed to copy:', err);
+      }
+  };
 
   useEffect(() => {
     const secret = sessionStorage.getItem(`host_secret_${roomId}`);
@@ -42,6 +55,27 @@ export default function GameRoom({ roomId }: GameRoomProps) {
     
     socket.on('connect', () => {
         console.log("Connected to server");
+        
+        // Try to restore session
+        const savedSession = localStorage.getItem('mensaje_cifrado_session');
+        if (savedSession) {
+            try {
+                const { roomId: savedRoomId, role: savedRole, nickname: savedNickname } = JSON.parse(savedSession);
+                if (savedRoomId === roomId && savedRole && savedNickname) {
+                    console.log("Restoring session...", savedRole, savedNickname);
+                    setNickname(savedNickname); // Restore nickname to state
+                    socket.emit('join_room', { roomId, role: savedRole, nickname: savedNickname }, (response: { success: boolean; state?: GameState; error?: string }) => {
+                        if (response.success && response.state) {
+                            setRole(savedRole);
+                            setGameState(response.state);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to parse session", e);
+            }
+        }
+
         // Get initial state to know mode
         socket.emit('get_room_state', roomId, (response: { success: boolean; state?: GameState }) => {
             if (response.success && response.state) {
@@ -85,6 +119,8 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       if (response.success && response.state) {
         setRole(selectedRole);
         setGameState(response.state);
+        // Save session
+        localStorage.setItem('mensaje_cifrado_session', JSON.stringify({ roomId, role: selectedRole, nickname }));
       } else {
         setError(response.error === 'Room not found' ? "Sala no encontrada" : (response.error || 'Error desconocido'));
       }
@@ -113,11 +149,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const handleChangeRole = () => {
       socket.emit('leave_role', { roomId, currentRole: role, nickname });
       setRole(null);
+      localStorage.removeItem('mensaje_cifrado_session');
       // Do not clear gameState so we remember the mode
   };
 
   const handleGoToHome = () => {
       socket.emit('leave_room', { roomId, nickname });
+      localStorage.removeItem('mensaje_cifrado_session');
       router.push('/');
   };
 
@@ -342,7 +380,13 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                 )}
             </div>
             
-            {/* New buttons for changing role and returning home */}
+            <button 
+                onClick={() => setShowShareModal(true)} 
+                className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-emerald-600/50 border border-white/10 rounded-full text-white transition-all text-sm"
+                title="Compartir Sala"
+            >
+                🔗
+            </button>
             <button 
                 onClick={handleChangeRole} 
                 className="w-8 h-8 flex items-center justify-center bg-white/5 hover:bg-purple-600/50 border border-white/10 rounded-full text-white transition-all text-sm"
@@ -484,6 +528,56 @@ export default function GameRoom({ roomId }: GameRoomProps) {
             {gameState.log[gameState.log.length - 1]}
          </div>
       </footer>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <div 
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 animate-in fade-in duration-200" 
+            onClick={() => setShowShareModal(false)}
+        >
+            <div 
+                className={`bg-[#0a0a0a] border ${gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.2)]'} rounded-2xl p-8 max-w-sm w-full relative overflow-hidden flex flex-col items-center gap-6`} 
+                onClick={e => e.stopPropagation()}
+            >
+                 <h3 className={`text-xl font-black tracking-widest uppercase ${gameState?.gameMode === 'NEURAL_LINK' ? 'text-emerald-400' : 'text-purple-400'}`}>
+                     ENLACE DE ACCESO
+                 </h3>
+                 
+                 <div className="bg-white p-4 rounded-xl">
+                     <QRCodeSVG 
+                        value={typeof window !== 'undefined' ? window.location.href : ''} 
+                        size={200}
+                        level={"H"}
+                        includeMargin={false}
+                     />
+                 </div>
+                 
+                 <div className="w-full flex flex-col gap-3">
+                     <div className="bg-white/5 p-3 rounded-lg text-center font-mono text-xs text-gray-400 break-all border border-white/10">
+                         {typeof window !== 'undefined' ? window.location.href : ''}
+                     </div>
+                     
+                     <button 
+                        onClick={handleCopyLink}
+                        className={`w-full py-3 rounded-xl font-bold tracking-widest transition-all flex items-center justify-center gap-2 ${
+                            copySuccess 
+                                ? 'bg-green-500 text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]' 
+                                : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                     >
+                        {copySuccess ? '¡ENLACE COPIADO!' : 'COPIAR ENLACE'}
+                     </button>
+                 </div>
+                 
+                 <button 
+                    onClick={() => setShowShareModal(false)}
+                    className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+                 >
+                    ✕
+                 </button>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

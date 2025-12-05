@@ -4,6 +4,8 @@ import next from "next";
 import { Server } from "socket.io";
 import { generateBoard, checkWinCondition, GameState } from "./lib/gameUtils";
 import { randomBytes } from "crypto";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+import { createRoomSchema, joinRoomSchema, giveClueSchema, flipCardSchema, changeMaxTimeSchema, resetGameSchema } from "./lib/validators";
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "0.0.0.0";
@@ -17,6 +19,23 @@ interface ServerGameState extends GameState {
 }
 
 const rooms = new Map<string, ServerGameState>();
+
+const rateLimiter = new RateLimiterMemory({
+  points: 10, // 10 points
+  duration: 1, // per second
+});
+
+// Helper to check rate limit
+async function checkRateLimit(socket: any) {
+    try {
+        await rateLimiter.consume(socket.id);
+        return true;
+    } catch (rejRes) {
+        socket.emit('error', { message: 'Rate limit exceeded' });
+        // socket.disconnect(true); // Optional: disconnected aggressively
+        return false;
+    }
+}
 
 function sanitizeState(state: ServerGameState): GameState {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -58,9 +77,17 @@ app.prepare().then(() => {
   io.on("connection", (socket) => {
     console.log("Client connected:", socket.id);
 
-    socket.on("create_room", (roomId: string, mode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD', maxTime: number = 180, callback) => {
+    socket.on("create_room", async (roomId: string, mode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD', maxTime: number = 180, callback) => {
+        if (!(await checkRateLimit(socket))) return;
+        
+        const validation = createRoomSchema.safeParse({ roomId, mode, maxTime });
+        if (!validation.success) {
+            if(callback) callback({ error: "Invalid data", details: validation.error.format() });
+            return;
+        }
+
         if (rooms.has(roomId)) {
-            callback({ error: "Room already exists" });
+            if(callback) callback({ error: "Room already exists" });
             return;
         }
         const { board, startingTeam } = generateBoard(mode);
@@ -99,7 +126,15 @@ app.prepare().then(() => {
         callback({ success: true, state: sanitizeState(initialState), hostSecret });
     });
 
-    socket.on("join_room", ({ roomId, role, nickname }: { roomId: string, role: 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE', nickname: string }, callback) => {
+    socket.on("join_room", async ({ roomId, role, nickname }: { roomId: string, role: 'TABLE' | 'SPYMASTER_RED' | 'SPYMASTER_BLUE', nickname: string }, callback) => {
+        if (!(await checkRateLimit(socket))) return;
+
+        const validation = joinRoomSchema.safeParse({ roomId, role, nickname });
+        if (!validation.success) {
+             if(callback) callback({ error: "Invalid data", details: validation.error.format() });
+             return;
+        }
+
         const room = rooms.get(roomId);
         if (!room) {
             callback({ error: "Room not found" });
@@ -138,7 +173,12 @@ app.prepare().then(() => {
         callback({ success: true, state: sanitizeState(room) });
     });
 
-    socket.on("give_clue", ({ roomId, number }: { roomId: string, number: number }) => {
+    socket.on("give_clue", async ({ roomId, number }: { roomId: string, number: number }) => {
+        if (!(await checkRateLimit(socket))) return;
+
+        const validation = giveClueSchema.safeParse({ roomId, number });
+        if (!validation.success) return;
+
         const room = rooms.get(roomId);
         if (!room || room.phase !== 'CLUE') return;
         
@@ -186,7 +226,12 @@ app.prepare().then(() => {
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
-    socket.on("flip_card", ({ roomId, cardId }: { roomId: string, cardId: number }) => {
+    socket.on("flip_card", async ({ roomId, cardId }: { roomId: string, cardId: number }) => {
+        if (!(await checkRateLimit(socket))) return;
+
+        const validation = flipCardSchema.safeParse({ roomId, cardId });
+        if (!validation.success) return;
+
         const room = rooms.get(roomId);
         if (!room || room.winner || room.phase !== 'GUESSING') return;
 
@@ -269,7 +314,12 @@ app.prepare().then(() => {
         io.to(roomId).emit("game_update", sanitizeState(room));
     });
     
-    socket.on("reset_game", ({ roomId, hostSecret }: { roomId: string, hostSecret: string }) => {
+    socket.on("reset_game", async ({ roomId, hostSecret }: { roomId: string, hostSecret: string }) => {
+         if (!(await checkRateLimit(socket))) return;
+
+         const validation = resetGameSchema.safeParse({ roomId, hostSecret });
+         if (!validation.success) return;
+
          const room = rooms.get(roomId);
          if(!room) return;
          
@@ -301,7 +351,12 @@ app.prepare().then(() => {
          io.to(roomId).emit("game_update", sanitizeState(room));
     });
 
-    socket.on("change_max_time", ({ roomId, maxTime }: { roomId: string, maxTime: number }) => {
+    socket.on("change_max_time", async ({ roomId, maxTime }: { roomId: string, maxTime: number }) => {
+        if (!(await checkRateLimit(socket))) return;
+
+        const validation = changeMaxTimeSchema.safeParse({ roomId, maxTime });
+        if (!validation.success) return;
+
         const room = rooms.get(roomId);
         if (!room || room.gameMode !== 'NEURAL_LINK') return;
         
