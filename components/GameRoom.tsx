@@ -113,7 +113,7 @@ export default function GameRoom({ roomId }: GameRoomProps) {
   const handleChangeRole = () => {
       socket.emit('leave_role', { roomId, currentRole: role, nickname });
       setRole(null);
-      setGameState(null);
+      // Do not clear gameState so we remember the mode
   };
 
   const handleGoToHome = () => {
@@ -131,10 +131,10 @@ export default function GameRoom({ roomId }: GameRoomProps) {
       <div className="min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden">
         {/* Background Grid Effect */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_50%_200px,#3b0764,transparent)] opacity-40 pointer-events-none"></div>
+        <div className={`absolute inset-0 ${gameState?.gameMode === 'NEURAL_LINK' ? 'bg-[radial-gradient(circle_800px_at_50%_200px,#064e3b,transparent)]' : 'bg-[radial-gradient(circle_800px_at_50%_200px,#3b0764,transparent)]'} opacity-40 pointer-events-none`}></div>
 
-        <div className="glass-panel p-8 rounded-2xl shadow-2xl max-w-lg w-full text-center relative z-10 border border-purple-500/20 box-glow-purple">
-          <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-2">SALA DE ACCESO</h2>
+        <div className={`glass-panel p-8 rounded-2xl shadow-2xl max-w-lg w-full text-center relative z-10 border ${gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/20 box-glow-emerald' : 'border-purple-500/20 box-glow-purple'}`}>
+          <h2 className={`text-3xl font-black text-transparent bg-clip-text ${gameState?.gameMode === 'NEURAL_LINK' ? 'bg-gradient-to-r from-emerald-400 to-teal-600' : 'bg-gradient-to-r from-purple-400 to-pink-600'} mb-2`}>SALA DE ACCESO</h2>
           <div className={`inline-block bg-purple-900/30 border ${
             gameState?.gameMode === 'NEURAL_LINK' ? 'border-emerald-500/30 text-emerald-200' : 'border-purple-500/30 text-purple-200'
           } px-3 py-1 rounded font-mono mb-6 tracking-widest`}>{roomId}</div>
@@ -322,9 +322,9 @@ export default function GameRoom({ roomId }: GameRoomProps) {
                                         }
                                     }}
                                     disabled={!isHost || gameState.gameMode !== 'NEURAL_LINK'}
-                                    className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border transition-all ${
+                                    className={`px-4 py-1.5 rounded-full font-bold text-xs tracking-widest border transition-all transform ${
                                         gameState.gameMode === 'NEURAL_LINK' 
-                                        ? `bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)] ${isHost ? 'hover:bg-emerald-500/20 cursor-pointer' : 'cursor-default'}`
+                                        ? `bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)] ${isHost ? 'hover:bg-emerald-500/20 cursor-pointer active:scale-95' : 'cursor-default'}`
                                         : isRedTurn ? 'bg-red-500/10 border-red-500 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)] cursor-default' : 'bg-blue-500/10 border-blue-500 text-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)] cursor-default'
                                     }`}
                                 >

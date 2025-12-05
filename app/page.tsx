@@ -68,6 +68,30 @@ export default function Home() {
               ENLACE NEURAL
             </button>
           </div>
+
+          {/* Game Mode Guide */}
+          <div className="mb-6 p-4 bg-white/5 rounded-xl border border-white/10 text-sm">
+            {gameMode === 'STANDARD' ? (
+              <div className="text-purple-200">
+                <h3 className="font-bold text-purple-400 mb-2 tracking-widest">OBJETIVO: MODO CLÁSICO</h3>
+                <ul className="list-disc list-inside space-y-1 text-xs opacity-80 leading-relaxed">
+                   <li>Dos equipos (Rojo y Azul).</li>
+                   <li>Encuentra todos tus agentes antes que el rival.</li>
+                   <li>Evita las cartas neutrales (pierdes turno).</li>
+                   <li>El <span className="text-red-500 font-bold">ASESINO</span> termina la partida instantáneamente.</li>
+                </ul>
+              </div>
+            ) : (
+              <div className="text-emerald-200">
+                <h3 className="font-bold text-emerald-400 mb-2 tracking-widest">OBJETIVO: ENLACE NEURAL</h3>
+                <ul className="list-disc list-inside space-y-1 text-xs opacity-80 leading-relaxed">
+                   <li>Cooperativo contra el reloj (Sistema).</li>
+                   <li>Encuentra los 15 agentes azules antes de que acabe el tiempo.</li>
+                   <li>Cualquiera de los <span className="text-red-500 font-bold">10 ASESINOS</span> termina la partida.</li>
+                </ul>
+              </div>
+            )}
+          </div>
           
           {gameMode === 'NEURAL_LINK' && (
               <div className="flex justify-center gap-2 mb-6">

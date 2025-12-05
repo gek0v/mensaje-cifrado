@@ -33,20 +33,31 @@ export interface GameState {
 
 export const TOTAL_CARDS = 25;
 
-export function generateBoard(): { board: Card[], startingTeam: 'RED' | 'BLUE' } {
+export function generateBoard(gameMode: 'STANDARD' | 'NEURAL_LINK' = 'STANDARD'): { board: Card[], startingTeam: 'RED' | 'BLUE' } {
   // Select 25 random words
   const shuffledWords = [...words].sort(() => 0.5 - Math.random()).slice(0, TOTAL_CARDS);
   
-  // Determine starting team (9 cards for start, 8 for second)
-  const startingTeam = Math.random() < 0.5 ? 'RED' : 'BLUE';
-  const secondTeam = startingTeam === 'RED' ? 'BLUE' : 'RED';
-  
-  const cardTypes: CardType[] = [
-    ...Array(9).fill(startingTeam),
-    ...Array(8).fill(secondTeam),
-    ...Array(7).fill('NEUTRAL'),
-    'ASSASSIN'
-  ];
+  let startingTeam: 'RED' | 'BLUE';
+  let cardTypes: CardType[];
+
+  if (gameMode === 'NEURAL_LINK') {
+    startingTeam = 'BLUE'; // Force blue to start in Neural Link
+    cardTypes = [
+      ...Array(15).fill('BLUE'),
+      ...Array(10).fill('ASSASSIN')
+    ];
+  } else {
+    // Determine starting team (9 cards for start, 8 for second)
+    startingTeam = Math.random() < 0.5 ? 'RED' : 'BLUE';
+    const secondTeam = startingTeam === 'RED' ? 'BLUE' : 'RED';
+    
+    cardTypes = [
+      ...Array(9).fill(startingTeam),
+      ...Array(8).fill(secondTeam),
+      ...Array(7).fill('NEUTRAL'),
+      'ASSASSIN'
+    ];
+  }
   
   // Shuffle types
   const shuffledTypes = cardTypes.sort(() => 0.5 - Math.random());
@@ -77,8 +88,8 @@ export function checkWinCondition(gameState: GameState): 'RED' | 'BLUE' | null {
   const redCards = board.filter(c => c.type === 'RED');
   const blueCards = board.filter(c => c.type === 'BLUE');
   
-  const redWin = redCards.every(c => c.revealed);
-  const blueWin = blueCards.every(c => c.revealed);
+  const redWin = redCards.length > 0 && redCards.every(c => c.revealed);
+  const blueWin = blueCards.length > 0 && blueCards.every(c => c.revealed);
   
   if (redWin) return 'RED';
   if (blueWin) return 'BLUE';

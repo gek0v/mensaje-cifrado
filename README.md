@@ -16,12 +16,9 @@ La experiencia tradicional de equipos enfrentados.
 Un modo frenético contrarreloj diseñado para 2 jugadores o un solo equipo contra el sistema.
 - **Objetivo:** Descubrir todos los agentes antes de que se agote el tiempo.
 - **Contrarreloj:** Elige partidas de **1:30**, **3:00** o **5:00** minutos.
-- **Sistema de Penalizaciones:** 
-  - Fallar una carta enemiga (Roja) resta **15 segundos**.
-  - El Asesino termina la partida inmediatamente (Victoria del Sistema).
-  - Cartas neutrales no penalizan tiempo.
 - **Interfaz Exclusiva:** HUD estilo "Matrix/Cyberpunk" con temporizador dinámico y acentos color esmeralda.
 - **Jefe Azul:** En este modo, el jugador toma el rol de Jefe Azul (Player) contra el Sistema (Rojo).
+- **Composición del Tablero Especial:** 15 tarjetas azules (agentes a descubrir) y 10 tarjetas de asesino (peligros a evitar). No hay cartas neutrales o del equipo rival.
 
 ## Características Principales
 

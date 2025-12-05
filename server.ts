@@ -63,7 +63,7 @@ app.prepare().then(() => {
             callback({ error: "Room already exists" });
             return;
         }
-        const { board, startingTeam } = generateBoard();
+        const { board, startingTeam } = generateBoard(mode);
         const redTotal = board.filter(c => c.type === 'RED').length;
         const blueTotal = board.filter(c => c.type === 'BLUE').length;
         const hostSecret = randomBytes(16).toString('hex');
@@ -106,6 +106,12 @@ app.prepare().then(() => {
             return;
         }
         socket.join(roomId);
+
+        // Remove from existing roles first to prevent duplicates
+        const redIdx = room.spymasters.RED.findIndex(p => p.id === socket.id);
+        if (redIdx !== -1) room.spymasters.RED.splice(redIdx, 1);
+        const blueIdx = room.spymasters.BLUE.findIndex(p => p.id === socket.id);
+        if (blueIdx !== -1) room.spymasters.BLUE.splice(blueIdx, 1);
 
         const playerObj = { id: socket.id, name: nickname };
 
@@ -206,24 +212,14 @@ app.prepare().then(() => {
             turnEnded = true;
         } else if (room.gameMode === 'NEURAL_LINK') {
             // Neural Link Logic (Player is BLUE)
-            if (card.type === 'NEUTRAL') {
-                // No penalty for Neural Link Neutral cards
-                room.log.push(`Neutral noise encountered. No time penalty.`);
-            } else if (card.type !== room.turn) { // Opponent (Red) in Neural Link
-                 const penalty = 15;
-                 room.timer = Math.max(0, room.timer - penalty);
-                 room.log.push(`Enemy firewall hit! Time penalty: -${penalty}s`);
-                 // Do NOT end turn, just penalize
-            } else {
-                // Correct guess (Blue card)
-                room.currentGuessesCount++;
-                const win = checkWinCondition(room);
-                if (win) {
-                    room.winner = win;
-                    room.timerActive = false;
-                    room.log.push(`${win} WINS! NEURAL LINK SECURE.`);
-                    turnEnded = true;
-                }
+            // Correct guess (Blue card)
+            room.currentGuessesCount++;
+            const win = checkWinCondition(room);
+            if (win) {
+                room.winner = win;
+                room.timerActive = false;
+                room.log.push(`${win} WINS! NEURAL LINK SECURE.`);
+                turnEnded = true;
             }
         } else {
             // Standard Logic
@@ -326,6 +322,50 @@ app.prepare().then(() => {
         room.log.push(`System clock reconfigured to ${maxTime}s.`);
         
         io.to(roomId).emit("game_update", sanitizeState(room));
+    });
+
+    socket.on("leave_role", ({ roomId }: { roomId: string }) => {
+        const room = rooms.get(roomId);
+        if (!room) return;
+        
+        let updated = false;
+        const redIdx = room.spymasters.RED.findIndex(p => p.id === socket.id);
+        if (redIdx !== -1) {
+            room.spymasters.RED.splice(redIdx, 1);
+            updated = true;
+        }
+        const blueIdx = room.spymasters.BLUE.findIndex(p => p.id === socket.id);
+        if (blueIdx !== -1) {
+            room.spymasters.BLUE.splice(blueIdx, 1);
+            updated = true;
+        }
+        
+        if (updated) {
+            io.to(roomId).emit("game_update", sanitizeState(room));
+        }
+    });
+
+    socket.on("leave_room", ({ roomId }: { roomId: string }) => {
+        const room = rooms.get(roomId);
+        if (!room) return;
+        
+        socket.leave(roomId);
+        
+        let updated = false;
+        const redIdx = room.spymasters.RED.findIndex(p => p.id === socket.id);
+        if (redIdx !== -1) {
+            room.spymasters.RED.splice(redIdx, 1);
+            updated = true;
+        }
+        const blueIdx = room.spymasters.BLUE.findIndex(p => p.id === socket.id);
+        if (blueIdx !== -1) {
+            room.spymasters.BLUE.splice(blueIdx, 1);
+            updated = true;
+        }
+        
+        if (updated) {
+            io.to(roomId).emit("game_update", sanitizeState(room));
+        }
     });
 
     socket.on("disconnect", () => {
